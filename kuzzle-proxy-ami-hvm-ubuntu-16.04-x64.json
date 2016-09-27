@@ -1,0 +1,32 @@
+{
+  "provisioners": [
+    {
+      "type": "shell",
+      "execute_command": "echo '{{user `ssh_pass`}}' | {{ .Vars }} sudo -E -S sh '{{ .Path }}'",
+      "inline": [
+        "add-apt-repository ppa:ansible/ansible",
+        "apt-get update",
+        "apt-get install -y ansible",
+        "echo '%sudo    ALL=(ALL)  NOPASSWD:ALL' >> /etc/sudoers"
+      ]
+    },
+    {
+      "type": "ansible-local",
+      "playbook_file": "../kuzzle-provisioners/kuzzle-proxy.yml",
+      "playbook_dir": "../kuzzle-provisioners/",
+      "extra_arguments": ["--extra-vars", "host={{user `host`}}"]
+    }
+  ],
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "AKIAIXFW7JQ2XDTYQI3Q",
+      "secret_key": "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",
+      "ami_name": "kuzzle-proxy-ami-hvm-ubuntu-16.04-x64-{{timestamp}}",
+      "ssh_username": "ubuntu",
+      "source_ami": "ami-a9a8e4c9",
+      "instance_type": "t2.micro",
+      "region": "us-west-1"
+    }
+  ]
+}
