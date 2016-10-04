@@ -1,14 +1,35 @@
-packer build -var 'host=localhost' -var 'path=/tmp/kuzzle' -var 'remote_user=root' -var 'access_key=<access_key>' -var 'secret_key=<secret_key>' kuzzle.json
+# This is a repository to build an AMI for AWS or DigitalOcean
 
+## Prerequisite
 
+You need https://www.packer.io
 
-  "builders": [
-    {
-      "type": "digitalocean",
-      "api_token": "ca3f62f8eceae265d0c041b99926d4201dcc5fd10f37b52d9ff3cf35a11a8648",
-      "snapshot_name": "kuzzle-{{timestamp}}",
-      "region": "lon1",
-      "size": "512mb",
-      "image": "ubuntu-16-04-x64"
-    }
-  ]
+## AWS
+
+### Build AMI of the proxy for ubuntu 16.04 x64
+
+```sh
+$ packer build -var 'access_key=<your access key>' -var 'secret_key=<your secret key>' kuzzle-proxy-ami-hvm-ubuntu-16.04-x64.json
+```
+
+## AWS
+
+### Build AMI of the proxy for ubuntu 16.04 x64
+
+```sh
+$ packer build -var 'access_key=<your access key>' -var 'secret_key=<your secret key>' kuzzle-proxy-ami-hvm-ubuntu-16.04-x64.json
+```
+
+### Build AMI of kuzzle for ubuntu 16.04 x64
+
+```sh
+$ packer build -var 'access_key=<your access key>' kuzzle-ami-hvm-ubuntu-16.04-x64.json
+```
+
+## DigitalOcean
+
+### Build image of the proxy and kuzzle for DigitalOcean
+
+```sh
+$ packer build -var 'api_token=<your api token>' kuzzle-fullstack-digitalocean-ubuntu-16.04-x64.json
+```
