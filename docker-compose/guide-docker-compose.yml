@@ -1,0 +1,6 @@
+kuzzleapidocumentation:
+  build: .
+  volumes:
+    - ./source:/app/source
+  ports:
+    - 4567:4567
