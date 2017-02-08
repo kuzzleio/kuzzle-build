@@ -2,6 +2,8 @@
 set -e
 
 # list of colors
+BOLD=$(tput bold)
+# NORMAL=$(tput sgr0)
 RED="\\033[1;31m"
 BLUE="\\033[1;34m"
 GREEN="\\033[1;32m"
@@ -16,14 +18,18 @@ write() {
   echo -e " $1$2" "$NORMAL" >&2
 }
 
-command_exists() {
+writeBold() {
+  echo -e "${BOLD} $1$2" "$NORMAL" >&2
+}
+
+commandExists() {
   command -v "$@" > /dev/null 2>&1
 }
 
 checkRoot() {
   if [ "$EUID" -ne 0 ]; then
     echo
-    echo "This script needs to be executed with root privileges."
+    writeBold "This script needs to be executed with root privileges."
     echo
     exit
   fi
@@ -31,8 +37,7 @@ checkRoot() {
 
 findOSType()
 {
-  echo "Determining os type..."
-  echo
+  writeBold "Determining os type..."
   osType=$(uname)
   if [ "$osType" == "Linux" ]; then
     if [ -f /etc/os-release ]; then
@@ -50,7 +55,7 @@ isOSSupported()
   case "$CURRENT_OS" in
     "UBUNTU" | "DEBIAN")
     {
-      echo "$CURRENT_OS is well supported."
+      write "$GREEN" "$CURRENT_OS is well supported."
       OS_IS_SUPPORTED=1
     } ;;
     *)
@@ -94,7 +99,7 @@ installDocker() {
     case $installDocker in
       [yY])
         echo
-        if command_exists curl; then
+        if commandExists curl; then
           echo "Installing Docker..."
           curl -sSL https://get.docker.com/ | sh
         else
@@ -125,7 +130,7 @@ runDocker() {
   while [[ "$runDocker" != [yYnN] ]]
   do
     echo -n "Do you want to run Docker now? (y/N) "
-    read  runDocker
+    read  runDocker trash
     case "$runDocker" in
       [yY])
         ;;
@@ -148,10 +153,10 @@ installDockerCompose() {
   while [[ "$installDockerCompose" != [yYnN] ]]
   do
     echo -n "Do you want to install Docker Compose now? (y/N) "
-    read installDockerCompose
+    read installDockerCompose trash
     case "$installDockerCompose" in
       [yY])
-        if command_exists curl; then
+        if commandExists curl; then
           echo "Installing Docker Compose..."
           curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           chmod +x /usr/local/bin/docker-compose
@@ -178,7 +183,7 @@ installDockerCompose() {
 setupMapCount() {
   REQUIRED_MAP_COUNT=262144
   SYSCTL_CONF_FILE=/etc/sysctl.conf
-  MAP_COUNT=$(sysctl -a | grep vm.max_map_count | cut -d'=' -f2 | tr -d ' ')
+  MAP_COUNT=$(sysctl -a 2> /dev/null | grep vm.max_map_count | cut -d'=' -f2 | tr -d ' ')
 
   if [ -z "$MAP_COUNT" ] || [ $MAP_COUNT -lt $REQUIRED_MAP_COUNT ]; then
     echo
@@ -189,7 +194,7 @@ setupMapCount() {
     while [[ "$setVmParam" != [yYnN] ]]
     do
       echo -n "Do you want to set the vm.max_map_count now? (y/N) "
-      read setVmParam
+      read setVmParam trash
       case "$setVmParam" in
         [yY])
           sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
@@ -202,7 +207,6 @@ setupMapCount() {
         [nN] | '')
           echo
           echo "Aborting."
-          exit 1
           ;;
         *)
         echo
@@ -215,14 +219,13 @@ setupMapCount() {
 
 collectPersonalData() {
   echo
-  echo "We'd be happy to know a little bit about you."
+  writeBold "We'd be happy to know a little bit about you."
   echo
-  echo -n "What's your email address? (press Enter to skip)"
+  write "What's your email address? (press Enter to skip)"
   read email trash
-  echo
-  echo -n "What's your name? (press Enter to skip)"
+  write "What's your name? (press Enter to skip)"
   read firstName lastName otherName yetAnotherName trash
-  echo "What do you plan to use Kuzzle for? (press Enter to skip)"
+  write "What do you plan to use Kuzzle for? (press Enter to skip)"
   read purpose
   # TODO send collected data to analytics service
 }
@@ -234,13 +237,34 @@ startKuzzle() {
   composerYMLURL="https://raw.githubusercontent.com/kuzzleio/kuzzle-build/master/docker-compose/kuzzle-docker-compose.yml"
   composerYMLPath="kuzzle-docker-compose.yml"
   curl -XGET $composerYMLURL > $composerYMLPath
-  docker-compose -f $composerYMLPath up -d
   echo
-  echo "Kuzzle is up and running!"
+  write "$GREEN" "The docker-compose YML file has been successfully downoloaded!"
+  while [[ "$launchTheStack" != [yYnN] ]]
+    do
+      writeBold "Do you want to start the Kuzzle stack now? (y/N) "
+      read launchTheStack trash
+      case "$launchTheStack" in
+        [yY])
+          docker-compose -f $composerYMLPath up -d
+            echo
+            write "$GREEN" "Kuzzle is up and running!"
+          ;;
+        [nN] | '')
+          echo
+          echo "Great."
+          ;;
+        *)
+          echo
+          echo "I did not understand your answer."
+          ;;
+      esac
+    done
   echo
-  echo "Where do we go from here?"
+  writeBold "Where do we go from here?"
+  echo "* You can start your Kuzzle stack by typing:"
+  echo "  docker-compose -f $composerYMLPath up -d"
   echo "* You can see the logs of your Kuzzle stack by typing:"
-  echo "  docker-compose -f $composerYMLPath logs"
+  echo "  docker-compose -f $composerYMLPath logs -f"
   echo "* You can check if everything is working by typing:"
   echo "  curl -XGET http://localhost:7511/"
   echo "* You can stop the Kuzzle stack by typing:"
@@ -257,7 +281,7 @@ checkRoot
 findOSType
 isOSSupported
 
-if ! command_exists docker; then
+if ! commandExists docker; then
   installDocker
 fi
 
@@ -269,7 +293,7 @@ if ! $(docker run hello-world > /dev/null); then
   exit
 fi
 
-if ! command_exists docker-compose; then
+if ! commandExists docker-compose; then
   installDockerCompose
 fi
 
