@@ -12,6 +12,7 @@ RT="\r\n"
 
 CURRENT_OS=Unknown
 OS_IS_SUPPORTED=0
+DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
@@ -154,7 +155,7 @@ installDockerCompose() {
           echo
           writeBold "Installing Docker Compose..."
           curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
+          chmod +x $DOCKER_COMPOSE_BIN
           echo
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         else
@@ -256,7 +257,7 @@ startKuzzle() {
         [yY])
           echo
           writeBold "Starting Kuzzle..."
-          docker-compose -f $composerYMLPath up -d
+          $DOCKER_COMPOSE_BIN -f $composerYMLPath up -d
           echo
           write "$GREEN" "[✔] Kuzzle is up and running!"
           ;;
@@ -312,7 +313,7 @@ if ! commandExists docker; then
   installDocker
 fi
 
-if ! $(docker run hello-world > /dev/null); then
+if ! $(docker run hello-world &> /dev/null); then
   echo
   writeBold "$RED" "[✖] Docker does not seem to be running on your system."
   writeBold "$RED" "    Please start the Docker daemon and re-run this script"
