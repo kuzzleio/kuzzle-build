@@ -182,46 +182,41 @@ installDockerCompose() {
 }
 
 setupMapCount() {
-  REQUIRED_MAP_COUNT=262144
   SYSCTL_CONF_FILE=/etc/sysctl.conf
-  MAP_COUNT=$(sysctl -a 2> /dev/null | grep vm.max_map_count | cut -d'=' -f2 | tr -d ' ')
-
-  if [ -z "$MAP_COUNT" ] || [ $MAP_COUNT -lt $REQUIRED_MAP_COUNT ]; then
-    echo
-    writeBold "[ℹ] The kernel configuration variable vm.max_map_count must be set to at least $REQUIRED_MAP_COUNT"
-    writeBold "    for Kuzzle to work properly, but it seems to be set to $MAP_COUNT on your system."
-    writeBold "    This script can set it automatically or you can do it manually."
-    write     "    More information at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html"
-    while [[ "$setVmParam" != [yYnN] ]]
-    do
-      promptBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
-      read setVmParam trash
-      case "$setVmParam" in
-        [yY])
-          echo
-          writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
-          sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
-          if [ -z "$MAP_COUNT" ]; then
-            echo "vm.max_map_count=$REQUIRED_MAP_COUNT" > $SYSCTL_CONF_FILE
-          else
-            sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' $SYSCTL_CONF_FILE > $SYSCTL_CONF_FILE
-          fi
-          echo
-          writeBold "$GREEN" "[✔] Kernel variable successfully set."
-          ;;
-        [nN] | '')
-          echo
-          writeBold "$BLUE" "Ok. Please set the kernel variable and re-run this script."
-          echo
-          exit 0
-          ;;
-        *)
+  echo
+  writeBold "[ℹ] The kernel configuration variable vm.max_map_count must be set to at least $REQUIRED_MAP_COUNT"
+  writeBold "    for Kuzzle to work properly, but it seems to be set to $MAP_COUNT on your system."
+  writeBold "    This script can set it automatically or you can do it manually."
+  write     "    More information at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html"
+  while [[ "$setVmParam" != [yYnN] ]]
+  do
+    promptBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
+    read setVmParam trash
+    case "$setVmParam" in
+      [yY])
         echo
-        writeBold "$RED" "[✖] I did not understand your answer."
+        writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
+        sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
+        if [ -z "$MAP_COUNT" ]; then
+          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" > $SYSCTL_CONF_FILE
+        else
+          sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' $SYSCTL_CONF_FILE > $SYSCTL_CONF_FILE
+        fi
+        echo
+        writeBold "$GREEN" "[✔] Kernel variable successfully set."
         ;;
-      esac
-    done
-  fi
+      [nN] | '')
+        echo
+        writeBold "$BLUE" "Ok. Please set the kernel variable and re-run this script."
+        echo
+        exit 0
+        ;;
+      *)
+      echo
+      writeBold "$RED" "[✖] I did not understand your answer."
+      ;;
+    esac
+  done
 }
 
 collectPersonalData() {
@@ -274,12 +269,18 @@ startKuzzle() {
     done
   echo
   writeBold "Where do we go from here?"
+  shortHelp
+}
+
+shortHelp() {
+  echo
+  writeBold "* You can open this short help by calling ./setup.sh --help"
   writeBold "* You can start Kuzzle by typing:"
   write "  docker-compose -f $composerYMLPath up -d"
   writeBold "* You can see the logs of the Kuzzle stack by typing:"
   write "  docker-compose -f $composerYMLPath logs -f"
   writeBold "* You can check if everything is working by typing:"
-  write "  curl -XGET http://localhost:7511/"
+  write "  curl -XGET http://localhost:7512/"
   writeBold "* You can stop Kuzzle by typing:"
   write "  docker-compose -f $composerYMLPath stop"
   writeBold "* You can restart Kuzzle by typing:"
@@ -290,6 +291,14 @@ startKuzzle() {
 
 # Main execution routine
 # ===========================
+
+if [ "$1" == "--help" ]; then
+  echo
+  writeBold "# Kuzzle short help"
+  writeBold "  ================="
+  shortHelp
+  exit 0
+fi
 
 echo
 writeBold "# Kuzzle Setup"
@@ -304,7 +313,17 @@ write     "* Feel free to join us on Gitter at https://gitter.im/kuzzleio/kuzzle
 write     "  to get help in real time."
 
 checkRoot
-# TODO check architecture (32 vs 64)
+
+CHECK_ARCH=$(uname -a | grep x86_64)
+if [ -z ${CHECK_ARCH} ]; then
+  echo
+  writeBold "$RED" "[✖] Kuzzle runs on x86_64 architectures, which does not seem."
+  writeBold "$RED" "    to be the architecture of your system."
+  write            "    Sorry, you cannot launch Kuzzle on this machine."
+  echo
+  exit 4
+fi
+
 # TODO check available memory
 findOSType
 isOSSupported
@@ -313,19 +332,25 @@ if ! commandExists docker; then
   installDocker
 fi
 
-if ! $(docker run hello-world &> /dev/null); then
+CHECK_DOCKER_RUN=$(docker run hello-world &> /dev/null)
+if ! ${CHECK_DOCKER_RUN} ; then
   echo
   writeBold "$RED" "[✖] Docker does not seem to be running on your system."
   writeBold "$RED" "    Please start the Docker daemon and re-run this script"
   write            "    More information at https://docs.docker.com/engine/admin/"
   echo
-  exit 4
+  exit 5
 fi
 
-if ! commandExists docker-compose; then
+if ! commandExists $DOCKER_COMPOSE_BIN; then
   installDockerCompose
 fi
 
-setupMapCount
+CHECK_MAP_COUNT=$(sysctl -a 2> /dev/null | grep vm.max_map_count | cut -d'=' -f2 | tr -d ' ')
+REQUIRED_MAP_COUNT=262144
+if [ -z "${CHECK_MAP_COUNT}" ] || [ ${CHECK_MAP_COUNT} -lt $REQUIRED_MAP_COUNT ]; then
+  setupMapCount
+fi
+
 collectPersonalData
 startKuzzle
