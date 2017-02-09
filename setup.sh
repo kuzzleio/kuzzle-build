@@ -117,11 +117,16 @@ installDocker() {
           curl -sSL https://get.docker.com/ | sh
           echo
           writeBold "$GREEN" "[✔] Docker successfully installed."
-        else
-          writeBold "$RED" "[✖] curl needs to be installed to launch the Docker installation script,"
-          writeBold "$RED" "    but it does not seem to be installed on your system."
+        elif commandExists wget; then
+          writeBold "[ℹ] Installing Docker..."
+          wget -qO- https://get.docker.com/ | sh
           echo
-          writeBold "$BLUE" "Please install curl and re-run this script."
+          writeBold "$GREEN" "[✔] Docker successfully installed."
+        else
+          writeBold "$RED" "[✖] curl or wget need to be installed to launch the Docker installation script,"
+          writeBold "$RED" "    but none seems to be installed on your system."
+          echo
+          writeBold "$BLUE" "Please install curl or wget and re-run this script."
           echo
           exit 3
         fi
@@ -154,15 +159,22 @@ installDockerCompose() {
         if commandExists curl; then
           echo
           writeBold "Installing Docker Compose..."
-          curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_COMPOSE_BIN
+          chmod +x $DOCKER_COMPOSE_BIN
+          echo
+          writeBold "$GREEN" "[✔] Docker Compose successfully installed."
+        elif commandExists wget; then
+          echo
+          writeBold "Installing Docker Compose..."
+          wget -O $DOCKER_COMPOSE_BIN "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)"
           chmod +x $DOCKER_COMPOSE_BIN
           echo
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         else
-          writeBold "$RED" "[✖] curl needs to be installed to launch the Docker Compose installation script,"
-          writeBold "$RED" "    but it does not seem to be installed on your system."
+          writeBold "$RED" "[✖] curl or wget need to be installed to launch the Docker Compose installation script,"
+          writeBold "$RED" "    but none seems to be installed on your system."
           echo
-          writeBold "$BLUE" "Please install curl and re-run this script."
+          writeBold "$BLUE" "Please install curl or wget and re-run this script."
           echo
           exit 3
         fi
@@ -232,12 +244,26 @@ collectPersonalData() {
 }
 
 startKuzzle() {
-  echo
-  writeBold "Downloading Kuzzle launch file..."
-  echo
   composerYMLURL="https://raw.githubusercontent.com/kuzzleio/kuzzle-build/master/docker-compose/kuzzle-docker-compose.yml"
   composerYMLPath="kuzzle-docker-compose.yml"
-  curl -XGET $composerYMLURL > $composerYMLPath
+  if commandExists curl; then
+    echo
+    writeBold "Downloading Kuzzle launch file..."
+    echo
+    curl -XGET $composerYMLURL > $composerYMLPath
+  elif commandExists wget; then
+    echo
+    writeBold "Downloading Kuzzle launch file..."
+    echo
+    wget -O $composerYMLPath $composerYMLURL
+  else
+    writeBold "$RED" "[✖] curl or wget need to be installed to download the Kuzzle launch file,"
+    writeBold "$RED" "    but none seems to be installed on your system."
+    echo
+    writeBold "$BLUE" "Please install curl or wget and re-run this script."
+    echo
+    exit 3
+  fi
   echo
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
@@ -317,7 +343,7 @@ checkRoot
 CHECK_ARCH=$(uname -a | grep x86_64)
 if [ -z ${CHECK_ARCH} ]; then
   echo
-  writeBold "$RED" "[✖] Kuzzle runs on x86_64 architectures, which does not seem."
+  writeBold "$RED" "[✖] Kuzzle runs on x86_64 architectures, which does not seem"
   writeBold "$RED" "    to be the architecture of your system."
   write            "    Sorry, you cannot launch Kuzzle on this machine."
   echo
