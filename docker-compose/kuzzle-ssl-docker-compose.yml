@@ -10,7 +10,7 @@ services:
       - "./docker-compose/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg"
       - "./docker-compose/haproxy/snakeoil.pem:/etc/ssl/private/snakeoil.pem"
     ports:
-      - "7511-7513:7511-7513"
+      - "7512:7512"
 
   proxy:
     image: kuzzleio/proxy
