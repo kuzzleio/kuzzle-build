@@ -2,13 +2,19 @@
 set -e
 
 # list of colors
-BOLD=$(tput bold)
-RED="\\033[1;31m"
-BLUE="\\033[1;34m"
-GREEN="\\033[1;32m"
-YELLOW="\\033[1;33m"
-NORMAL="\\033[0;39m"
-RT="\r\n"
+# check if stdout is a terminal...
+if test -t 1; then
+  # see if it supports colors...
+  ncolors=$(tput colors)
+  if test -n "$ncolors" && test $ncolors -ge 8; then
+    BOLD=$(tput bold)
+    RED="$(tput setaf 1)"
+    BLUE="$(tput setaf 4)"
+    GREEN="$(tput setaf 2)"
+    YELLOW="$(tput setaf 3)"
+    NORMAL="$(tput sgr0)"
+  fi
+fi
 
 CURRENT_OS=Unknown
 OS_IS_SUPPORTED=0
@@ -16,15 +22,15 @@ DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
-  echo -e " $1$2" "$NORMAL" >&2
+  echo -e " $1$2" "$NORMAL"
 }
 
 writeBold() {
-  echo -e "${BOLD} $1$2" "$NORMAL" >&2
+  echo -e "${BOLD} $1$2" "$NORMAL"
 }
 
 promptBold() {
-  echo -n -e "${BOLD} $1$2" "$NORMAL" >&2
+  echo -n -e "${BOLD} $1$2" "$NORMAL"
 }
 
 commandExists() {
@@ -80,14 +86,26 @@ isOSSupported()
             ;;
           [nN] | '')
             echo
-            writeBold "$BLUE" "Ok. We encourage you to get in touch with the team (tech@kuzzle.io)"
-            writeBold "$BLUE" "to request support for your system."
+            writeBold "$BLUE" "Ok. Would you like to notify the Kuzzle team that you tried"
+            writeBold "$BLUE" "to install Kuzzle on an unsupported OS? This will increase"
+            writeBold "$BLUE" "the chances that your OS will be supported one day."
+            write "The following data will be sent to the Kuzzle team:"
+            write " * OS = $CURRENT_OS"
             echo
-            if commandExists curl; then
-              # TODO send feedback to analytics system to notify that an install
-              # has been attempted on a non-supported system
-              echo LOL
-            fi
+            promptBold "[❓] Do you want to notify the Kuzzle team? (y/N)"
+            read notifyTeam trash
+            case "$notifyTeam" in
+              [yY])
+                # TODO send feedback to analytics system to notify that an install
+                # has been attempted on a non-supported system
+                ;;
+              *)
+                echo
+                writeBold "$BLUE" "Ok. We encourage you to get in touch with the team (tech@kuzzle.io)"
+                writeBold "$BLUE" "to request support for your system."
+                echo
+                ;;
+            esac
             exit 2
             ;;
           *)
@@ -98,6 +116,45 @@ isOSSupported()
       done
     } ;;
   esac
+}
+
+installCurl() {
+  echo
+  writeBold "[ℹ] cUrl must be installed to run Kuzzle."
+  writeBold "    This script can install cUrl for you, otherwise you can do it manually."
+  write     "    We encourage you to use your package manager."
+  while [[ "$installCurl" != [yYnN] ]]
+  do
+    promptBold "[❓] Do you want to install cUrl now? (y/N)"
+    read installCurl trash
+    case $installCurl in
+      [yY])
+        echo
+        if commandExists apt-get; then
+          apt-get -y install curl
+        elif commandExists yum; then
+          yum install curl
+        else
+          echo
+          writeBold "$YELLOW" "[✖] Sorry, I didn't find a suitable package manager to install cUrl."
+          writeBold           "    I only support apt-get and yum. You know better than me how to do this."
+          echo
+          exit 8
+        fi
+        ;;
+      [nN] | '')
+        echo
+        writeBold "$BLUE" "Ok. Please install cUrl and re-run this script. "
+        echo
+        exit 0
+        ;;
+      *)
+        echo
+        writeBold "$RED" "[✖] I did not understand your answer."
+        ;;
+    esac
+  done
+
 }
 
 installDocker() {
@@ -210,9 +267,10 @@ setupMapCount() {
         writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
         sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
         if [ -z "$MAP_COUNT" ]; then
-          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" > $SYSCTL_CONF_FILE
+          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
         else
-          sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' $SYSCTL_CONF_FILE > $SYSCTL_CONF_FILE
+          sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
+          mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
         fi
         echo
         writeBold "$GREEN" "[✔] Kernel variable successfully set."
@@ -236,7 +294,7 @@ collectPersonalData() {
   writeBold  "[ℹ] Please let us know a little bit about youself."
   promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
   read email trash
-  promptBold "    What's your name?${NORMAL} (press Enter to skip)"
+  promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
   read firstName lastName otherName yetAnotherName trash
   promptBold "    What do you plan to use Kuzzle for?${NORMAL} (press Enter to skip)"
   read purpose
@@ -244,7 +302,7 @@ collectPersonalData() {
 }
 
 startKuzzle() {
-  composerYMLURL="https://raw.githubusercontent.com/kuzzleio/kuzzle-build/master/docker-compose/kuzzle-docker-compose.yml"
+  composerYMLURL="http://kuzzle.io/docker-compose.yml"
   composerYMLPath="kuzzle-docker-compose.yml"
   if commandExists curl; then
     echo
@@ -267,8 +325,8 @@ startKuzzle() {
   echo
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
-  writeBold          "    manyally using Docker Compose."
-  write              "    To manyally launch Kuzzle you can type the following command:"
+  writeBold          "    manually using Docker Compose."
+  write              "    To manually launch Kuzzle you can type the following command:"
   write              "    docker-compose -f $composerYMLPath up"
   while [[ "$launchTheStack" != [yYnN] ]]
     do
@@ -278,7 +336,7 @@ startKuzzle() {
         [yY])
           echo
           writeBold "Starting Kuzzle..."
-          $DOCKER_COMPOSE_BIN -f $composerYMLPath up -d
+          $(command -v docker-compose) -f $composerYMLPath up -d
           echo
           write "$GREEN" "[✔] Kuzzle is up and running!"
           ;;
@@ -336,12 +394,10 @@ echo
 write     "* You can refer to http://docs.kuzzle.io/ if you need better"
 write     "  understanding of the installation process."
 write     "* Feel free to join us on Gitter at https://gitter.im/kuzzleio/kuzzle"
-write     "  to get help in real time."
-
-checkRoot
+write     "  if you need help."
 
 CHECK_ARCH=$(uname -a | grep x86_64)
-if [ -z ${CHECK_ARCH} ]; then
+if [ -z "${CHECK_ARCH}" ]; then
   echo
   writeBold "$RED" "[✖] Kuzzle runs on x86_64 architectures, which does not seem"
   writeBold "$RED" "    to be the architecture of your system."
@@ -350,9 +406,35 @@ if [ -z ${CHECK_ARCH} ]; then
   exit 4
 fi
 
-# TODO check available memory
+CHECK_MEM=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+MEM_REQ=4194304
+if [ ${CHECK_MEM} -lt $MEM_REQ ]; then
+  echo
+  writeBold "$RED" "[✖] Kuzzle needs at least 4Gb of memory, which does not seem"
+  writeBold "$RED" "    to be the available amount on your system."
+  write            "    Sorry, you cannot launch Kuzzle on this machine."
+  echo
+  exit 5
+fi
+
+CHECK_CORES=$(awk '/^processor/{print $3}' /proc/cpuinfo | tail -1)
+if [ ${CHECK_CORES} -lt 3 ]; then
+ echo
+  writeBold "$RED" "[✖] Kuzzle needs at least 4 processor cores, which does not seem"
+  writeBold "$RED" "    to be the available amount on your system."
+  write            "    Sorry, you cannot launch Kuzzle on this machine."
+  echo
+  exit 6
+fi
+
+checkRoot
+
 findOSType
 isOSSupported
+
+if ! commandExists curl; then
+  installCurl
+fi
 
 if ! commandExists docker; then
   installDocker
@@ -368,7 +450,7 @@ if ! ${CHECK_DOCKER_RUN} ; then
   exit 5
 fi
 
-if ! commandExists $DOCKER_COMPOSE_BIN; then
+if ! commandExists docker-compose; then
   installDockerCompose
 fi
 
