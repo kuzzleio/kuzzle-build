@@ -19,6 +19,7 @@ fi
 CURRENT_OS=Unknown
 OS_IS_SUPPORTED=0
 DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
+ANALYTICS_URL="http://localhost:7512/setupsh/analytics/_create"
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
@@ -62,18 +63,17 @@ findOSType()
 isOSSupported()
 {
   echo
-  # echo "Detected OS is" $CURRENT_OS
   case "$CURRENT_OS" in
     "UBUNTU" | "DEBIAN")
     {
-      write "$GREEN" "[✔] Your OS ($CURRENT_OS) is officially supported."
+      writeBold "$GREEN" "[✔] Your OS ($CURRENT_OS) is officially supported."
       OS_IS_SUPPORTED=1
     } ;;
     *)
     {
-      write "$YELLOW" "[✖] Your OS ($CURRENT_OS) is not officially supported."
-      write           "    This means we didn't thoroughly test Kuzzle on your"
-      write           "    system. It is likely to work, so you may want to continue."
+      writeBold "$YELLOW" "[✖] Your OS ($CURRENT_OS) is not officially supported."
+      write               "    This means we didn't thoroughly test Kuzzle on your"
+      write               "    system. It is likely to work, so you may want to continue."
       OS_IS_SUPPORTED=0
       while [[ "$proceedNotSupported" != [yYnN] ]]
       do
@@ -85,32 +85,33 @@ isOSSupported()
             writeBold "$GREEN" "Great! Join us on Gitter if you need help (https://gitter.im/kuzzleio/kuzzle)"
             ;;
           [nN] | '')
-            echo
-            writeBold "$BLUE" "Ok. Would you like to notify the Kuzzle team that you tried"
-            writeBold "$BLUE" "to install Kuzzle on an unsupported OS? This will increase"
-            writeBold "$BLUE" "the chances that your OS will be supported one day."
-            write "The following data will be sent to the Kuzzle team:"
-            write " * OS = $CURRENT_OS"
-            echo
-            promptBold "[❓] Do you want to notify the Kuzzle team? (y/N)"
-            read notifyTeam trash
-            case "$notifyTeam" in
-              [yY])
-                # TODO send feedback to analytics system to notify that an install
-                # has been attempted on a non-supported system
-                ;;
-              *)
-                echo
-                writeBold "$BLUE" "Ok. We encourage you to get in touch with the team (tech@kuzzle.io)"
-                writeBold "$BLUE" "to request support for your system."
-                echo
-                ;;
-            esac
-            exit 2
+            if [ -n $DL_BIN ]; then
+              echo
+              writeBold "$BLUE" "Ok. This script can notify the Kuzzle team that you tried"
+              writeBold "$BLUE" "to install Kuzzle on an unsupported OS."
+              write "The following data will be sent to the Kuzzle team:"
+              write " * OS = $CURRENT_OS"
+              echo
+              writeBold "[❓] Do you want to notify the Kuzzle team? (y/N)"
+              write      "    This will increase the chances that your OS will be supported in the future."
+              read notifyTeam trash
+              case "$notifyTeam" in
+                [yY])
+                  $DL_BIN $UL_OPTS '{"type": "failed-attempt", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
+                  ;;
+                *)
+                  echo
+                  writeBold "$BLUE" "Ok. We encourage you to get in touch with the team (tech@kuzzle.io)"
+                  writeBold "$BLUE" "to request support for your system."
+                  echo
+                  ;;
+              esac
+              exit 2
+            fi
             ;;
           *)
             echo
-            writeBold "$RED" "[✖] I did not understand your answer."
+            writeBold "$RED" "[✖] Please, answer Y or N."
             ;;
         esac
       done
@@ -118,43 +119,66 @@ isOSSupported()
   esac
 }
 
-installCurl() {
+installDL() {
   echo
-  writeBold "[ℹ] cUrl must be installed to run Kuzzle."
-  writeBold "    This script can install cUrl for you, otherwise you can do it manually."
-  write     "    We encourage you to use your package manager."
-  while [[ "$installCurl" != [yYnN] ]]
+  writeBold "[ℹ] It is recommended to have cUrl to install Kuzzle. However it"
+  writeBold "    does not seem to be installed on your system."
+  while [[ "$installDL" != [yYnN] ]]
   do
-    promptBold "[❓] Do you want to install cUrl now? (y/N)"
-    read installCurl trash
-    case $installCurl in
+    promptBold "[❓] Do you want to install cUrl automatically now? (y/N)"
+    read installDL trash
+    case $installDL in
       [yY])
         echo
         if commandExists apt-get; then
           apt-get -y install curl
+          setDL curl
         elif commandExists yum; then
           yum install curl
+          setDL curl
         else
           echo
-          writeBold "$YELLOW" "[✖] Sorry, I didn't find a suitable package manager to install cUrl."
-          writeBold           "    I only support apt-get and yum. You know better than me how to do this."
+          writeBold "$YELLOW" "[✖] Sorry, no suitable package manager found."
           echo
           exit 8
         fi
         ;;
       [nN] | '')
         echo
-        writeBold "$BLUE" "Ok. Please install cUrl and re-run this script. "
+        writeBold "$BLUE" "Ok."
         echo
-        exit 0
         ;;
       *)
         echo
-        writeBold "$RED" "[✖] I did not understand your answer."
+        writeBold "$RED" "[✖] Please, answer Y or N."
         ;;
     esac
   done
+}
 
+setDL() {
+  if [ "$1" == 'curl' ]; then
+    DL_BIN=$(command -v curl)
+    DL_OPTS="-sSL"
+    UL_OPTS='-H Content-Type:application/json --data'
+  elif [ "$1" == 'wget' ]; then
+    DL_BIN=$(command -v wget)
+    DL_OPTS="-qO-"
+    UL_OPTS="--header=Content-Type:application/json --post-data="
+  else
+    echo
+    writeBold "$RED" "[✖] something went wrong detecting the downlaoder."
+    exit 10
+  fi
+}
+
+failDL() {
+  echo
+  writeBold "$YELLOW" "[✖] curl or wget are necessary to install Kuzzle. However,"
+  writeBold "$YELLOW" "     none of them seems to be available on your system."
+  write               "     Please install curl or wget and re-run this script."
+  echo
+  exit 9
 }
 
 installDocker() {
@@ -166,37 +190,24 @@ installDocker() {
   do
     promptBold "[❓] Do you want to install Docker now? (y/N)"
     read installDocker trash
+    echo
     case $installDocker in
       [yY])
-        echo
-        if commandExists curl; then
-          writeBold "[ℹ] Installing Docker..."
-          curl -sSL https://get.docker.com/ | sh
-          echo
-          writeBold "$GREEN" "[✔] Docker successfully installed."
-        elif commandExists wget; then
-          writeBold "[ℹ] Installing Docker..."
-          wget -qO- https://get.docker.com/ | sh
-          echo
-          writeBold "$GREEN" "[✔] Docker successfully installed."
+        if [ -z $DL_BIN ]; then
+          failDL
         else
-          writeBold "$RED" "[✖] curl or wget need to be installed to launch the Docker installation script,"
-          writeBold "$RED" "    but none seems to be installed on your system."
-          echo
-          writeBold "$BLUE" "Please install curl or wget and re-run this script."
-          echo
-          exit 3
+          writeBold "[ℹ] Installing Docker..."
+          $DL_BIN $DL_OPTS https://get.docker.com/ | sh
+          writeBold "$GREEN" "[✔] Docker successfully installed."
         fi
         ;;
       [nN] | '')
-        echo
         writeBold "$BLUE" "Ok. Please install Docker and re-run this script. "
         echo
         exit 0
         ;;
       *)
-        echo
-        writeBold "$RED" "[✖] I did not understand your answer."
+        writeBold "$RED" "[✖] Please, answer Y or N."
         ;;
     esac
   done
@@ -211,40 +222,25 @@ installDockerCompose() {
   do
     promptBold "[❓] Do you want to install Docker Compose now? (y/N)"
     read installDockerCompose trash
+    echo
     case "$installDockerCompose" in
       [yY])
-        if commandExists curl; then
-          echo
-          writeBold "Installing Docker Compose..."
-          curl -L "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_COMPOSE_BIN
-          chmod +x $DOCKER_COMPOSE_BIN
-          echo
-          writeBold "$GREEN" "[✔] Docker Compose successfully installed."
-        elif commandExists wget; then
-          echo
-          writeBold "Installing Docker Compose..."
-          wget -O $DOCKER_COMPOSE_BIN "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)"
-          chmod +x $DOCKER_COMPOSE_BIN
-          echo
-          writeBold "$GREEN" "[✔] Docker Compose successfully installed."
+        if [ -z $DL_BIN ]; then
+          failDL
         else
-          writeBold "$RED" "[✖] curl or wget need to be installed to launch the Docker Compose installation script,"
-          writeBold "$RED" "    but none seems to be installed on your system."
-          echo
-          writeBold "$BLUE" "Please install curl or wget and re-run this script."
-          echo
-          exit 3
+          writeBold "Installing Docker Compose..."
+          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" > $DOCKER_COMPOSE_BIN
+          chmod +x $DOCKER_COMPOSE_BIN
+          writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         fi
         ;;
       [nN] | '')
-        echo
         writeBold "$BLUE" "Ok. Please install Docker Compose and re-run this script."
         echo
         exit 0
         ;;
       *)
-        echo
-        writeBold "$RED" "[✖] I did not understand your answer."
+        writeBold "$RED" "[✖] Please, answer Y or N."
         ;;
     esac
   done
@@ -283,7 +279,7 @@ setupMapCount() {
         ;;
       *)
       echo
-      writeBold "$RED" "[✖] I did not understand your answer."
+      writeBold "$RED" "[✖] Please, answer Y or N."
       ;;
     esac
   done
@@ -291,36 +287,46 @@ setupMapCount() {
 
 collectPersonalData() {
   echo
-  writeBold  "[ℹ] Please let us know a little bit about youself."
-  promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
-  read email trash
-  promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
-  read firstName lastName otherName yetAnotherName trash
-  promptBold "    What do you plan to use Kuzzle for?${NORMAL} (press Enter to skip)"
-  read purpose
-  # TODO send collected data to analytics service
+  writeBold "[❓] Would you agree on letting us know a little bit about you? (y/N)"
+  write     "    We'd like to know your name and email, your OS type and why"
+  write     "    you're interested in Kuzzle."
+  while [[ "$agreeOnPersonalData" != [yYnN] ]]
+  do
+    read agreeOnPersonalData trash
+    echo
+    case "$agreeOnPersonalData" in
+      [yY])
+        promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
+        read email trash
+        promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
+        read firstName lastName otherName yetAnotherName trash
+        promptBold "    What do you plan to use Kuzzle for?${NORMAL} (press Enter to skip)"
+        read purpose
+        $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$firstName $lastName $otherName $yetAnotherName"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL # &> /dev/null
+        echo
+        writeBold "$GREEN" "[✔] Thank you!"
+        ;;
+      [nN] | '')
+        writeBold "$BLUE" "Ok."
+        agreeOnPersonalData="n"
+        echo
+        ;;
+      *)
+        writeBold "$RED" "[✖] Please, answer Y or N."
+        ;;
+    esac
+  done
 }
 
 startKuzzle() {
   composerYMLURL="http://kuzzle.io/docker-compose.yml"
   composerYMLPath="kuzzle-docker-compose.yml"
-  if commandExists curl; then
-    echo
-    writeBold "Downloading Kuzzle launch file..."
-    echo
-    curl -XGET $composerYMLURL > $composerYMLPath
-  elif commandExists wget; then
-    echo
-    writeBold "Downloading Kuzzle launch file..."
-    echo
-    wget -O $composerYMLPath $composerYMLURL
+  if [ -z $DL_BIN ]; then
+    failDL
   else
-    writeBold "$RED" "[✖] curl or wget need to be installed to download the Kuzzle launch file,"
-    writeBold "$RED" "    but none seems to be installed on your system."
+    writeBold "Downloading Kuzzle launch file..."
     echo
-    writeBold "$BLUE" "Please install curl or wget and re-run this script."
-    echo
-    exit 3
+    $DL_BIN $DL_OPTS $composerYMLURL > $composerYMLPath
   fi
   echo
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
@@ -330,7 +336,7 @@ startKuzzle() {
   write              "    docker-compose -f $composerYMLPath up"
   while [[ "$launchTheStack" != [yYnN] ]]
     do
-      promptBold "[❓] Do you want to start Kuzzle now? (y/N) "
+      promptBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
       read launchTheStack trash
       case "$launchTheStack" in
         [yY])
@@ -338,7 +344,7 @@ startKuzzle() {
           writeBold "Starting Kuzzle..."
           $(command -v docker-compose) -f $composerYMLPath up -d
           echo
-          write "$GREEN" "[✔] Kuzzle is up and running!"
+          writeBold "$GREEN" "[✔] Kuzzle is up and running!"
           ;;
         [nN] | '')
           echo
@@ -347,7 +353,7 @@ startKuzzle() {
           ;;
         *)
           echo
-          writeBold "$RED" "[✖] I did not understand your answer."
+          writeBold "$RED" "[✖] Please, answer Y or N."
           ;;
       esac
     done
@@ -429,12 +435,17 @@ fi
 
 checkRoot
 
+if commandExists curl; then
+  setDL "curl"
+elif commandExists wget; then
+  setDL "wget"
+else
+  installDL
+fi
+
 findOSType
 isOSSupported
 
-if ! commandExists curl; then
-  installCurl
-fi
 
 if ! commandExists docker; then
   installDocker
@@ -460,5 +471,7 @@ if [ -z "${CHECK_MAP_COUNT}" ] || [ ${CHECK_MAP_COUNT} -lt $REQUIRED_MAP_COUNT ]
   setupMapCount
 fi
 
-collectPersonalData
+if [ -n "$DL_BIN" ]; then
+  collectPersonalData
+fi
 startKuzzle
