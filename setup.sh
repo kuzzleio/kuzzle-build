@@ -19,7 +19,7 @@ fi
 CURRENT_OS=Unknown
 OS_IS_SUPPORTED=0
 DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
-ANALYTICS_URL="http://localhost:7512/setupsh/analytics/_create"
+ANALYTICS_URL="http://analytics.kuzzle.io/"
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
@@ -87,17 +87,14 @@ isOSSupported()
           [nN] | '')
             if [ -n $DL_BIN ]; then
               echo
-              writeBold "$BLUE" "Ok. This script can notify the Kuzzle team that you tried"
-              writeBold "$BLUE" "to install Kuzzle on an unsupported OS."
-              write "The following data will be sent to the Kuzzle team:"
-              write " * OS = $CURRENT_OS"
-              echo
-              writeBold "[❓] Do you want to notify the Kuzzle team? (y/N)"
-              write      "    This will increase the chances that your OS will be supported in the future."
+              writeBold "[❓] Would you like to be notified when your OS is supported? (y/N)"
+              write      "   This will increase the chances that your OS will be supported in the future."
               read notifyTeam trash
               case "$notifyTeam" in
                 [yY])
-                  $DL_BIN $UL_OPTS '{"type": "failed-attempt", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
+                  promptBold "[❓] Ok. What is your email address?"
+                  read email trash
+                  $DL_BIN $UL_OPTS '{"type": "failed-attempt", "os": "'$CURRENT_OS'", "email": "'$email'"}' $ANALYTICS_URL &> /dev/null
                   ;;
                 *)
                   echo
