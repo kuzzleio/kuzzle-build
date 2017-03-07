@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # list of colors
 # check if stdout is a terminal...
@@ -36,6 +35,37 @@ promptBold() {
 
 commandExists() {
   command -v "$@" > /dev/null 2>&1
+}
+
+vercomp () {
+  if [[ $1 == $2 ]]
+  then
+    return 0
+  fi
+  local IFS=.
+  local i ver1=($1) ver2=($2)
+  # fill empty fields in ver1 with zeros
+  for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+  do
+    ver1[i]=0
+  done
+  for ((i=0; i<${#ver1[@]}; i++))
+  do
+    if [[ -z ${ver2[i]} ]]
+    then
+      # fill empty fields in ver2 with zeros
+      ver2[i]=0
+    fi
+    if ((10#${ver1[i]} > 10#${ver2[i]}))
+    then
+      return 1
+    fi
+    if ((10#${ver1[i]} < 10#${ver2[i]}))
+    then
+      return 2
+    fi
+  done
+  return 0
 }
 
 checkRoot() {
@@ -179,8 +209,6 @@ failDL() {
 }
 
 installDocker() {
-  echo
-  writeBold "[ℹ] Docker must be installed to run Kuzzle."
   writeBold "    This script can install Docker for you, otherwise you can do it manually."
   write     "    More information at https://docs.docker.com/engine/installation/"
   while [[ "$installDocker" != [yYnN] ]]
@@ -211,8 +239,6 @@ installDocker() {
 }
 
 installDockerCompose() {
-  echo
-  writeBold "[ℹ] Docker Compose must be installed to run Kuzzle."
   writeBold "    This script can install Docker Compose for you, otherwise you can do it manually."
   write     "    More information at https://docs.docker.com/compose/install/"
   while [[ "$installDockerCompose" != [yYnN] ]]
@@ -445,6 +471,18 @@ isOSSupported
 
 
 if ! commandExists docker; then
+  echo
+  writeBold "[ℹ] Docker must be installed to run Kuzzle."
+  installDocker
+fi
+
+MIN_DOCKER_VER=1.12.0
+dockerVersion=$(docker -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
+vercomp ${dockerVersion} $MIN_DOCKER_VER
+if [[ $? == 2 ]] ; then
+  echo
+  writeBold "[ℹ] Docker ($MIN_DOCKER_VER+) is needed to run Kuzzle,"
+  writeBold "    but version ${dockerVersion} is currently installed."
   installDocker
 fi
 
@@ -459,6 +497,18 @@ if ! ${CHECK_DOCKER_RUN} ; then
 fi
 
 if ! commandExists docker-compose; then
+  echo
+  writeBold "[ℹ] Docker Compose must be installed to run Kuzzle."
+  installDockerCompose
+fi
+
+MIN_DOCKER_COMPOSE_VER=1.8.0
+dockerComposeVersion=$(docker-compose -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
+vercomp ${dockerComposeVersion} $MIN_DOCKER_COMPOSE_VER
+if [[ $? == 2 ]] ; then
+  echo
+  writeBold "[ℹ] Docker Compose ($MIN_DOCKER_COMPOSE_VER+) is needed to run Kuzzle,"
+  writeBold "    but version ${dockerComposeVersion} is currently installed."
   installDockerCompose
 fi
 
