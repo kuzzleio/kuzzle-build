@@ -1,14 +1,16 @@
 # HAProxy uses a self signed certificate. You have to accept the exception
 # in your browser. A proper certificate should be used for non development purposes.
-# In this setup, all exposed ports are using SSL.
+# In this setup, Kuzzle port is using SSL.
 version: '2'
 
 services:
   haproxy:
     image: haproxy:1.6.4-alpine
+    depends_on:
+      - proxy
     volumes:
-      - "./docker-compose/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg"
-      - "./docker-compose/haproxy/snakeoil.pem:/etc/ssl/private/snakeoil.pem"
+      - "./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg"
+      - "./haproxy/snakeoil.pem:/etc/ssl/private/snakeoil.pem"
     ports:
       - "7512:7512"
 
