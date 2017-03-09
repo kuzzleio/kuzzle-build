@@ -19,6 +19,8 @@ CURRENT_OS=Unknown
 OS_IS_SUPPORTED=0
 DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
 ANALYTICS_URL="http://analytics.kuzzle.io/"
+GITTER_URL="https://gitter.im/kuzzleio/kuzzle"
+SUPPORT_MAIL="support@kuzzle.io"
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
@@ -118,7 +120,7 @@ isOSSupported()
                   ;;
                 *)
                   echo
-                  writeBold "$BLUE" "Ok. We encourage you to get in touch with the team (tech@kuzzle.io)"
+                  writeBold "$BLUE" "Ok. We encourage you to get in touch with the team ($SUPPORT_MAIL)"
                   writeBold "$BLUE" "to request support for your system."
                   echo
                   ;;
@@ -365,36 +367,56 @@ startKuzzle() {
   writeBold          "    manually using Docker Compose."
   write              "    To manually launch Kuzzle you can type the following command:"
   write              "    docker-compose -f $composerYMLPath up"
-  while [[ "$launchTheStack" != [yYnN] ]]
-    do
-      echo
-      promptBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
-      read launchTheStack trash
-      case "$launchTheStack" in
-        [yY])
-          echo
-          writeBold "[ℹ] Starting Kuzzle..."
-          $(command -v docker-compose) -f $composerYMLPath up -d
-          echo
-          if [ "$?" == 0 ]; then
-            writeBold "$GREEN" "[✔] Kuzzle is up and running!"
-          fi
-          ;;
-        [nN] | '')
-          echo
-          writeBold "$BLUE" "Ok."
-          launchTheStack=n
-          ;;
-        *)
-          echo
-          writeBold "$RED" "[✖] Please, answer Y or N."
-          ;;
-      esac
-    done
+  while [[ "$launchTheStack" != [yYnN] ]]; do
+    echo
+    promptBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
+    read launchTheStack trash
+    case "$launchTheStack" in
+      [yY])
+        echo
+        writeBold "[ℹ] Starting Kuzzle..."
+        $(command -v docker-compose) -f $composerYMLPath up -d &> /dev/null
+        isKuzzleRunning
+        ;;
+      [nN] | '')
+        echo
+        writeBold "$BLUE" "Ok."
+        launchTheStack=n
+        ;;
+      *)
+        echo
+        writeBold "$RED" "[✖] Please, answer Y or N."
+        ;;
+    esac
+  done
+}
+
+isKuzzleRunning() {
+  promptBold "[ℹ] Checking that everything is running"
+
+  while ! curl -f -s -o /dev/null "http://localhost:7512"
+  do
+    echo -n "."
+    sleep 2
+  done
   echo
-  writeBold "# Where do we go from here?"
-  writeBold "  ========================="
-  shortHelp
+  CHECK_KUZZLE_RUNNING=$(curl -s -S -I http://localhost:7512 | grep HTTP | perl -nle 'm/HTTP\/1\.1 (\d\d\d)/;print $1')
+  if [ "$CHECK_KUZZLE_RUNNING" != "400" ]; then
+    echo
+    writeBold "$RED" "[✖] Ooops! Something went wrong."
+    write            "    Kuzzle does not seem to respond as expected to requests to"
+    write            "    http://localhost:7511"
+    echo
+    writeBold "$YELLOW" "Feel free to get in touch with the support team by sending"
+    writeBold "$YELLOW" "a mail to $SUPPORT_MAIL or by joining the chat room on"
+    writeBold "$YELLOW" "Gitter at $GITTER_URL - We'll be glad to help you."
+    echo
+    write     "Sorry for the inconvenience."
+    echo
+    exit 8
+  else
+    writeBold "$GREEN" "[✔] Kuzzle is running!"
+  fi
 }
 
 shortHelp() {
@@ -435,7 +457,7 @@ writeBold "all the necessary dependencies."
 echo
 write     "* You can refer to http://docs.kuzzle.io/ if you need better"
 write     "  understanding of the installation process."
-write     "* Feel free to join us on Gitter at https://gitter.im/kuzzleio/kuzzle"
+write     "* Feel free to join us on Gitter at $GITTER_URL"
 write     "  if you need help."
 echo
 promptBold "$BLUE" "Press Enter to start."
@@ -587,8 +609,9 @@ echo
 writeBold "$GREEN" "[✔] All the requirements are met!"
 writeBold          "    We are ready to install and start Kuzzle."
 
-if [ -n "$DL_BIN" ]; then
-  collectPersonalData
-fi
-
 startKuzzle
+collectPersonalData
+
+writeBold "# Where do we go from here?"
+writeBold "  ========================="
+shortHelp
