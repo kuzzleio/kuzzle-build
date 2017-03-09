@@ -486,6 +486,7 @@ write "$GREEN" "[✔] At least 4 processor cores available."
 if [ "$EUID" -ne 0 ]; then
   echo
   writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
+  write               "    Try typing: sudo $0"
   echo
   exit 1
 fi
