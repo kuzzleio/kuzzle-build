@@ -316,7 +316,7 @@ collectPersonalData() {
       2) purpose="Web" ;;
       3) purpose="Mobile" ;;
       4) purpose="Machine-to-machine" ;;
-      5) purpose="Other";
+      5) purpose="Other" ;;
     esac
     writeBold "[❓] Would you like us to reach you to have your feedback on Kuzzle? (y/N)"
     write     "    We will be really discreet (and this will help us a lot improving Kuzzle)"
