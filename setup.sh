@@ -142,6 +142,7 @@ installDL() {
   writeBold "    does not seem to be installed on your system."
   while [[ "$installDL" != [yYnN] ]]
   do
+    echo
     promptBold "[❓] Do you want to install cUrl automatically now? (y/N)"
     read installDL trash
     case $installDL in
@@ -205,6 +206,7 @@ installDocker() {
   write     "    More information at https://docs.docker.com/engine/installation/"
   while [[ "$installDocker" != [yYnN] ]]
   do
+    echo
     promptBold "[❓] Do you want to install Docker now? (y/N)"
     read installDocker trash
     echo
@@ -214,7 +216,7 @@ installDocker() {
           failDL
         else
           writeBold "[ℹ] Installing Docker..."
-          $DL_BIN $DL_OPTS https://get.docker.com/ | sh &> /dev/null
+          $DL_BIN $DL_OPTS https://get.docker.com/ | sh
           writeBold "$GREEN" "[✔] Docker successfully installed."
         fi
         ;;
@@ -235,6 +237,7 @@ installDockerCompose() {
   write     "    More information at https://docs.docker.com/compose/install/"
   while [[ "$installDockerCompose" != [yYnN] ]]
   do
+    echo
     promptBold "[❓] Do you want to install Docker Compose now? (y/N)"
     read installDockerCompose trash
     echo
@@ -267,6 +270,7 @@ setupMapCount() {
   write     "    More information at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html"
   while [[ "$setVmParam" != [yYnN] ]]
   do
+    echo
     promptBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
     read setVmParam trash
     case "$setVmParam" in
@@ -298,48 +302,64 @@ setupMapCount() {
 
 collectPersonalData() {
   echo
-  writeBold "[❓] Would you agree on letting us know a little bit about you? (y/N)"
-  write     "    We'd like to know your name and email, your OS type and why"
-  write     "    you're interested in Kuzzle."
-  while [[ "$agreeOnPersonalData" != [yYnN] ]]
-  do
-    read agreeOnPersonalData trash
-    echo
-    case "$agreeOnPersonalData" in
-      [yY])
-        promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
-        read email trash
-        promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
-        read firstName lastName otherName yetAnotherName trash
-        promptBold "    What do you plan to use Kuzzle for?${NORMAL} (press Enter to skip)"
-        read purpose
-        $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$firstName $lastName $otherName $yetAnotherName"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL # &> /dev/null
-        echo
-        writeBold "$GREEN" "[✔] Thank you!"
-        ;;
-      [nN] | '')
-        writeBold "$BLUE" "Ok."
-        agreeOnPersonalData="n"
-        echo
-        ;;
-      *)
-        writeBold "$RED" "[✖] Please, answer Y or N."
-        ;;
+  writeBold "[❓] What are you going to use Kuzzle for?"
+  write     "    1) IoT"
+  write     "    2) Web"
+  write     "    3) Mobile"
+  write     "    4) Machine-to-machine"
+  write     "    5) Other"
+  write     "    *) Stop bugging me"
+  read purpose trash
+  if [ -n "$purpose" ] && (( "$purpose" > 0 && "$purpose" < 6 )); then
+    case "$purpose" in
+      1) purpose="IoT" ;;
+      2) purpose="Web" ;;
+      3) purpose="Mobile" ;;
+      4) purpose="Machine-to-machine" ;;
+      5) purpose="Other";
     esac
-  done
+    writeBold "[❓] Would you like us to reach you to have your feedback on Kuzzle? (y/N)"
+    write     "    We will be really discreet (and this will help us a lot improving Kuzzle)"
+    while [[ "$agreeOnPersonalData" != [yYnN] ]]
+    do
+      read agreeOnPersonalData trash
+      case "$agreeOnPersonalData" in
+        [yY])
+          promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
+          read email trash
+          promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
+          read firstName lastName otherName yetAnotherName trash
+          echo
+          writeBold "$GREEN" "[✔] Thanks a lot!"
+          ;;
+        [nN] | '')
+          writeBold "$BLUE" "Ok."
+          agreeOnPersonalData="n"
+          echo
+          ;;
+        *)
+          writeBold "$RED" "[✖] Please, answer Y or N."
+          ;;
+      esac
+    done
+  else
+    writeBold "$BLUE" "Ok."
+    echo
+    purpose="Stop bugging me"
+  fi
+  $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$firstName $lastName $otherName $yetAnotherName"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
 }
 
 startKuzzle() {
+  echo
   composerYMLURL="http://kuzzle.io/docker-compose.yml"
   composerYMLPath="kuzzle-docker-compose.yml"
   if [ -z $DL_BIN ]; then
     failDL
   else
-    writeBold "Downloading Kuzzle launch file..."
-    echo
+    writeBold "[ℹ] Downloading Kuzzle launch file..."
     $DL_BIN $DL_OPTS $composerYMLURL > $composerYMLPath
   fi
-  echo
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
   writeBold          "    manually using Docker Compose."
@@ -347,15 +367,18 @@ startKuzzle() {
   write              "    docker-compose -f $composerYMLPath up"
   while [[ "$launchTheStack" != [yYnN] ]]
     do
+      echo
       promptBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
       read launchTheStack trash
       case "$launchTheStack" in
         [yY])
           echo
-          writeBold "Starting Kuzzle..."
+          writeBold "[ℹ] Starting Kuzzle..."
           $(command -v docker-compose) -f $composerYMLPath up -d
           echo
-          writeBold "$GREEN" "[✔] Kuzzle is up and running!"
+          if [ "$?" == 0 ]; then
+            writeBold "$GREEN" "[✔] Kuzzle is up and running!"
+          fi
           ;;
         [nN] | '')
           echo
@@ -369,7 +392,8 @@ startKuzzle() {
       esac
     done
   echo
-  writeBold "Where do we go from here?"
+  writeBold "# Where do we go from here?"
+  writeBold "  ========================="
   shortHelp
 }
 
@@ -434,11 +458,11 @@ fi
 write "$GREEN" "[✔] Architecture is x86_64."
 
 CHECK_MEM=$(awk '/MemTotal/{print $2}' /proc/meminfo)
-MEM_REQ=4194304
-if [ ${CHECK_MEM} -lt $MEM_REQ ]; then
+MEM_REQ=4000000
+if (( "$CHECK_MEM" < "$MEM_REQ" )); then
   echo
   writeBold "$RED" "[✖] Kuzzle needs at least 4Gb of memory, which does not seem"
-  writeBold "$RED" "    to be the available amount on your system."
+  writeBold "$RED" "    to be the available amount on your system (${CHECK_MEM})."
   write            "    Sorry, you cannot launch Kuzzle on this machine."
   echo
   exit 5
@@ -447,9 +471,10 @@ fi
 write "$GREEN" "[✔] Available memory is at least 4Gb."
 
 CHECK_CORES=$(awk '/^processor/{print $3}' /proc/cpuinfo | tail -1)
-if [ ${CHECK_CORES} -lt 3 ]; then
+MIN_CORES=4
+if (( "$CHECK_CORES" < "$MIN_CORES" )); then
  echo
-  writeBold "$RED" "[✖] Kuzzle needs at least 4 processor cores, which does not seem"
+  writeBold "$RED" "[✖] Kuzzle needs at least $MIN_CORES processor cores, which does not seem"
   writeBold "$RED" "    to be the available amount on your system."
   write            "    Sorry, you cannot launch Kuzzle on this machine."
   echo
