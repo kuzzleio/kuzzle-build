@@ -68,15 +68,6 @@ vercomp () {
   return 0
 }
 
-checkRoot() {
-  if [ "$EUID" -ne 0 ]; then
-    echo
-    writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
-    echo
-    exit 1
-  fi
-}
-
 findOSType()
 {
   osType=$(uname)
@@ -92,15 +83,14 @@ findOSType()
 
 isOSSupported()
 {
-  echo
   case "$CURRENT_OS" in
     "UBUNTU" | "DEBIAN")
     {
-      writeBold "$GREEN" "[✔] Your OS ($CURRENT_OS) is officially supported."
       OS_IS_SUPPORTED=1
     } ;;
     *)
     {
+      echo
       writeBold "$YELLOW" "[✖] Your OS ($CURRENT_OS) is not officially supported."
       write               "    This means we didn't thoroughly test Kuzzle on your"
       write               "    system. It is likely to work, so you may want to continue."
@@ -160,9 +150,11 @@ installDL() {
         if commandExists apt-get; then
           apt-get -y install curl
           setDL curl
+          writeBold "$GREEN" "[✔] cUrl successfully installed."
         elif commandExists yum; then
           yum install curl
           setDL curl
+          writeBold "$GREEN" "[✔] cUrl successfully installed."
         else
           echo
           writeBold "$YELLOW" "[✖] Sorry, no suitable package manager found."
@@ -222,7 +214,7 @@ installDocker() {
           failDL
         else
           writeBold "[ℹ] Installing Docker..."
-          $DL_BIN $DL_OPTS https://get.docker.com/ | sh
+          $DL_BIN $DL_OPTS https://get.docker.com/ | sh &> /dev/null
           writeBold "$GREEN" "[✔] Docker successfully installed."
         fi
         ;;
@@ -271,9 +263,6 @@ installDockerCompose() {
 
 setupMapCount() {
   SYSCTL_CONF_FILE=/etc/sysctl.conf
-  echo
-  writeBold "[ℹ] The kernel configuration variable vm.max_map_count must be set to at least $REQUIRED_MAP_COUNT"
-  writeBold "    for Kuzzle to work properly, but it seems to be set to $MAP_COUNT on your system."
   writeBold "    This script can set it automatically or you can do it manually."
   write     "    More information at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html"
   while [[ "$setVmParam" != [yYnN] ]]
@@ -291,7 +280,6 @@ setupMapCount() {
           sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
           mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
         fi
-        echo
         writeBold "$GREEN" "[✔] Kernel variable successfully set."
         ;;
       [nN] | '')
@@ -413,17 +401,25 @@ if [ "$1" == "--help" ]; then
   exit 0
 fi
 
+clear
 echo
 writeBold "# Kuzzle Setup"
 writeBold "  ============"
 echo
-writeBold "This script will help you launch Kuzzle and install"
+writeBold "This script will help you launching Kuzzle and installing"
 writeBold "all the necessary dependencies."
 echo
 write     "* You can refer to http://docs.kuzzle.io/ if you need better"
 write     "  understanding of the installation process."
 write     "* Feel free to join us on Gitter at https://gitter.im/kuzzleio/kuzzle"
 write     "  if you need help."
+echo
+promptBold "$BLUE" "Press Enter to start."
+read start
+
+echo
+writeBold "[ℹ] Checking system pre-requisites..."
+echo
 
 CHECK_ARCH=$(uname -a | grep x86_64)
 if [ -z "${CHECK_ARCH}" ]; then
@@ -434,6 +430,8 @@ if [ -z "${CHECK_ARCH}" ]; then
   echo
   exit 4
 fi
+
+write "$GREEN" "[✔] Architecture is x86_64."
 
 CHECK_MEM=$(awk '/MemTotal/{print $2}' /proc/meminfo)
 MEM_REQ=4194304
@@ -446,6 +444,8 @@ if [ ${CHECK_MEM} -lt $MEM_REQ ]; then
   exit 5
 fi
 
+write "$GREEN" "[✔] Available memory is at least 4Gb."
+
 CHECK_CORES=$(awk '/^processor/{print $3}' /proc/cpuinfo | tail -1)
 if [ ${CHECK_CORES} -lt 3 ]; then
  echo
@@ -456,69 +456,113 @@ if [ ${CHECK_CORES} -lt 3 ]; then
   exit 6
 fi
 
-checkRoot
+write "$GREEN" "[✔] At least 4 processor cores available."
 
-if commandExists curl; then
+if [ "$EUID" -ne 0 ]; then
+  echo
+  writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
+  echo
+  exit 1
+fi
+
+write "$GREEN" "[✔] Script has root privileges."
+
+if ! commandExists curl && ! commandExists wget; then
+  INSTALL_DL=1
+  write "$YELLOW" "[✖] cUrl is not installed."
+  exit 1
+elif commandExists curl; then
   setDL "curl"
+  write "$GREEN" "[✔] cUrl is installed."
 elif commandExists wget; then
   setDL "wget"
-else
-  installDL
+  write "$GREEN" "[✔] Wget is installed."
 fi
-
-findOSType
-isOSSupported
-
 
 if ! commandExists docker; then
-  echo
-  writeBold "[ℹ] Docker must be installed to run Kuzzle."
-  installDocker
-fi
-
-MIN_DOCKER_VER=1.12.0
-dockerVersion=$(docker -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
-vercomp ${dockerVersion} $MIN_DOCKER_VER
-if [[ $? == 2 ]] ; then
-  echo
-  writeBold "[ℹ] Docker ($MIN_DOCKER_VER+) is needed to run Kuzzle,"
-  writeBold "    but version ${dockerVersion} is currently installed."
-  installDocker
-fi
-
-CHECK_DOCKER_RUN=$(docker run hello-world &> /dev/null)
-if ! ${CHECK_DOCKER_RUN} ; then
+  write "$YELLOW" "[✖] Docker is not installed."
+  INSTALL_DOCKER=1
+elif [[ $? == 2 ]]; then
+  MIN_DOCKER_VER=1.12.0
+  dockerVersion=$(docker -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
+  vercomp ${dockerVersion} $MIN_DOCKER_VER
+  write "$YELLOW" "[✖] The current version of Docker ${dockerVersion} is older"
+  write "$YELLOW"  "    than the required one ($MIN_DOCKER_VER+)."
+  INSTALL_DOCKER=1
+elif ! $INSTALL_DOCKER && ! $(docker run hello-world &> /dev/null); then
   echo
   writeBold "$RED" "[✖] Docker does not seem to be running on your system."
   writeBold "$RED" "    Please start the Docker daemon and re-run this script"
   write            "    More information at https://docs.docker.com/engine/admin/"
   echo
   exit 5
+else
+  write "$GREEN" "[✔] Docker is installed and running."
 fi
 
 if ! commandExists docker-compose; then
-  echo
-  writeBold "[ℹ] Docker Compose must be installed to run Kuzzle."
-  installDockerCompose
-fi
-
-MIN_DOCKER_COMPOSE_VER=1.8.0
-dockerComposeVersion=$(docker-compose -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
-vercomp ${dockerComposeVersion} $MIN_DOCKER_COMPOSE_VER
-if [[ $? == 2 ]] ; then
-  echo
-  writeBold "[ℹ] Docker Compose ($MIN_DOCKER_COMPOSE_VER+) is needed to run Kuzzle,"
-  writeBold "    but version ${dockerComposeVersion} is currently installed."
-  installDockerCompose
+  write "$YELLOW" "[✖] Docker Compose is not installed."
+  INSTALL_DOCKER_COMPOSE=1
+elif [[ $? == 2 ]]; then
+  MIN_DOCKER_COMPOSE_VER=1.8.0
+  dockerComposeVersion=$(docker-compose -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
+  vercomp ${dockerComposeVersion} $MIN_DOCKER_COMPOSE_VER
+  write "$YELLOW" "[✖] The current version of Docker ${dockerComposeVersion} is older"
+  write "$YELLOW"  "    than the required one ($MIN_DOCKER_COMPOSE_VER+)."
+  INSTALL_DOCKER_COMPOSE=1
+else
+  write "$GREEN" "[✔] Docker Compose is installed."
 fi
 
 CHECK_MAP_COUNT=$(sysctl -a 2> /dev/null | grep vm.max_map_count | cut -d'=' -f2 | tr -d ' ')
 REQUIRED_MAP_COUNT=262144
 if [ -z "${CHECK_MAP_COUNT}" ] || [ ${CHECK_MAP_COUNT} -lt $REQUIRED_MAP_COUNT ]; then
+  write "$YELLOW" "[✖] The current value of the kernel configuration variable vm.max_map_count (${CHECK_MAP_COUNT})"
+  write "$YELLOW"  "    is lower than the required one ($REQUIRED_MAP_COUNT+)."
+  SETUP_MAP_COUNT=1
+else
+  write "$GREEN" "[✔] vm.max_map_count is at least $REQUIRED_MAP_COUNT."
+fi
+
+if [[ "$INSTALL_DOCKER" == 1 || "$INSTALL_DOCKER_COMPOSE" == 1 || "$INSTALL_DL" == 1 || "$SETUP_MAP_COUNT" == 1 ]]; then
+  echo
+  writeBold          "[ℹ] Some of the requirements are not met. Let's take a look."
+  promptBold "$BLUE" "    Press Enter to continue."
+  read trash
+  findOSType
+  isOSSupported
+fi
+
+if [[ "$INSTALL_DL" == 1 ]]; then
+  echo
+  writeBold "$YELLOW" "[ℹ] cUrl needs to be installed."
+  installDL
+fi
+
+if [[ "$INSTALL_DOCKER" == 1 ]]; then
+  echo
+  writeBold "$YELLOW" "[ℹ] Docker needs to be installed."
+  installDocker
+fi
+
+if [[ "$INSTALL_DOCKER_COMPOSE" == 1 ]]; then
+  echo
+  writeBold "$YELLOW" "[ℹ] Docker Compose needs to be installed."
+  installDockerCompose
+fi
+
+if [[ "$SETUP_MAP_COUNT" == 1 ]]; then
+  echo
+  writeBold "$YELLOW" "[ℹ] vm.max_map_count needs to be set at least to $REQUIRED_MAP_COUNT."
   setupMapCount
 fi
+
+echo
+writeBold "$GREEN" "[✔] All the requirements are met!"
+writeBold          "    We are ready to install and start Kuzzle."
 
 if [ -n "$DL_BIN" ]; then
   collectPersonalData
 fi
+
 startKuzzle
