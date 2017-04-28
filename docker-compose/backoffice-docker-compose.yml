@@ -15,6 +15,12 @@ services:
 
   kuzzle:
     image: kuzzleio/kuzzle
+    cap_add:
+      - SYS_PTRACE
+    depends_on:
+      - proxy
+      - redis
+      - elasticsearch
     environment:
       - kuzzle_services__db__host=elasticsearch
       - kuzzle_services__internalCache__node__host=redis

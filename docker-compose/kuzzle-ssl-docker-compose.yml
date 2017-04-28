@@ -19,6 +19,8 @@ services:
 
   kuzzle:
     image: kuzzleio/kuzzle
+    cap_add:
+      - SYS_PTRACE
     depends_on:
       - proxy
       - redis
