@@ -249,7 +249,7 @@ installDockerCompose() {
           failDL
         else
           writeBold "Installing Docker Compose..."
-          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.10.0/docker-compose-$(uname -s)-$(uname -m)" > $DOCKER_COMPOSE_BIN
+          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > $DOCKER_COMPOSE_BIN
           chmod +x $DOCKER_COMPOSE_BIN
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         fi
@@ -312,7 +312,7 @@ collectPersonalData() {
   write     "    5) Other"
   write     "    *) Stop bugging me"
   read purpose trash
-  if [ -n "$purpose" ] && (( "$purpose" > 0 && "$purpose" < 6 )); then
+  if [ -n "$purpose" ] && [[ $yournumber =~ '^[1-6]+$' ]]; then
     case "$purpose" in
       1) purpose="IoT" ;;
       2) purpose="Web" ;;
@@ -400,8 +400,8 @@ isKuzzleRunning() {
     sleep 2
   done
   echo
-  CHECK_KUZZLE_RUNNING=$(curl -s -S -I http://localhost:7512 | grep HTTP | perl -nle 'm/HTTP\/1\.1 (\d\d\d)/;print $1')
-  if [ "$CHECK_KUZZLE_RUNNING" != "400" ]; then
+  CHECK_KUZZLE_RUNNING=$(curl -s -S -I -XGET http://localhost:7512 | grep HTTP | perl -nle 'm/HTTP\/1\.1 (\d\d\d)/;print $1')
+  if [ "$CHECK_KUZZLE_RUNNING" != "200" ]; then
     echo
     writeBold "$RED" "[✖] Ooops! Something went wrong."
     write            "    Kuzzle does not seem to respond as expected to requests to"
@@ -492,19 +492,6 @@ fi
 
 write "$GREEN" "[✔] Available memory is at least 4Gb."
 
-CHECK_CORES=$(awk '/^processor/{print $3}' /proc/cpuinfo | tail -1)
-MIN_CORES=4
-if (( "$CHECK_CORES" < "$MIN_CORES" )); then
- echo
-  writeBold "$RED" "[✖] Kuzzle needs at least $MIN_CORES processor cores, which does not seem"
-  writeBold "$RED" "    to be the available amount on your system."
-  write            "    Sorry, you cannot launch Kuzzle on this machine."
-  echo
-  exit 6
-fi
-
-write "$GREEN" "[✔] At least 4 processor cores available."
-
 if [ "$EUID" -ne 0 ]; then
   echo
   writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
@@ -552,7 +539,7 @@ if ! commandExists docker-compose; then
   write "$YELLOW" "[✖] Docker Compose is not installed."
   INSTALL_DOCKER_COMPOSE=1
 elif [[ $? == 2 ]]; then
-  MIN_DOCKER_COMPOSE_VER=1.8.0
+  MIN_DOCKER_COMPOSE_VER=1.12.0
   dockerComposeVersion=$(docker-compose -v | perl -nle 'm/(\d+(\.\d*(\.\d*)?)?)/;print $1')
   vercomp ${dockerComposeVersion} $MIN_DOCKER_COMPOSE_VER
   write "$YELLOW" "[✖] The current version of Docker ${dockerComposeVersion} is older"
