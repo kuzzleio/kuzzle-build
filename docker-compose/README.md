@@ -18,6 +18,3 @@ You need:
 
 `docker-compose -f kuzzle-ssl-docker-compose.yml up`
 
-## Kuzzle Guide (for contributors)
-
-`docker-compose -f guide-docker-compose.yml up`
