@@ -6,30 +6,25 @@ version: '2'
 services:
   haproxy:
     image: haproxy:1.6.4-alpine
+    ports:
+      - "7512:7512"
     depends_on:
-      - proxy
+      - kuzzle
     volumes:
       - "./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg"
       - "./haproxy/snakeoil.pem:/etc/ssl/private/snakeoil.pem"
-    ports:
-      - "7512:7512"
-
-  proxy:
-    image: kuzzleio/proxy
 
   kuzzle:
     image: kuzzleio/kuzzle
     cap_add:
       - SYS_PTRACE
     depends_on:
-      - proxy
       - redis
       - elasticsearch
     environment:
       - kuzzle_services__db__client__host=http://elasticsearch:9200
       - kuzzle_services__internalCache__node__host=redis
       - kuzzle_services__memoryStorage__node__host=redis
-      - kuzzle_services__proxyBroker__host=proxy
       - NODE_ENV=production
 
   redis:
