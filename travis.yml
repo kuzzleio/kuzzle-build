@@ -1,0 +1,12 @@
+dist: trusty
+sudo: required
+
+services:
+- docker
+
+script:
+- bash test/run.sh
+
+cache:
+  directories:
+    – $HOME/.pm2
