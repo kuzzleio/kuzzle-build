@@ -6,7 +6,3 @@ services:
 
 script:
 - bash test/run.sh
-
-cache:
-  directories:
-    – $HOME/.pm2
