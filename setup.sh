@@ -99,7 +99,8 @@ isOSSupported()
       OS_IS_SUPPORTED=0
       while [[ "$proceedNotSupported" != [yYnN] ]]
       do
-        promptBold "[❓] Do you want to continue? (y/N)"
+        writeBold "[❓] Do you want to continue? (y/N)"
+        echo -n "> "
         read proceedNotSupported trash
         case "$proceedNotSupported" in
           [yY])
@@ -111,10 +112,12 @@ isOSSupported()
               echo
               writeBold "[❓] Would you like to be notified when your OS is supported? (y/N)"
               write      "   This will increase the chances that your OS will be supported in the future."
+              echo -n "> "
               read notifyTeam trash
               case "$notifyTeam" in
                 [yY])
-                  promptBold "[❓] Ok. What is your email address?"
+                  writeBold "[❓] Ok. What is your email address?"
+                  echo -n "> "
                   read email trash
                   $DL_BIN $UL_OPTS '{"type": "failed-attempt", "os": "'$CURRENT_OS'", "email": "'$email'"}' $ANALYTICS_URL &> /dev/null
                   ;;
@@ -145,7 +148,8 @@ installDL() {
   while [[ "$installDL" != [yYnN] ]]
   do
     echo
-    promptBold "[❓] Do you want to install cUrl automatically now? (y/N)"
+    writeBold "[❓] Do you want to install cUrl automatically now? (y/N)"
+    echo -n "> "
     read installDL trash
     case $installDL in
       [yY])
@@ -209,7 +213,8 @@ installDocker() {
   while [[ "$installDocker" != [yYnN] ]]
   do
     echo
-    promptBold "[❓] Do you want to install Docker now? (y/N)"
+    writeBold "[❓] Do you want to install Docker now? (y/N)"
+    echo -n "> "
     read installDocker trash
     echo
     case $installDocker in
@@ -240,7 +245,8 @@ installDockerCompose() {
   while [[ "$installDockerCompose" != [yYnN] ]]
   do
     echo
-    promptBold "[❓] Do you want to install Docker Compose now? (y/N)"
+    writeBold "[❓] Do you want to install Docker Compose now? (y/N)"
+    echo -n "> "
     read installDockerCompose trash
     echo
     case "$installDockerCompose" in
@@ -273,7 +279,8 @@ setupMapCount() {
   while [[ "$setVmParam" != [yYnN] ]]
   do
     echo
-    promptBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
+    writeBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
+    echo -n "> "
     read setVmParam trash
     case "$setVmParam" in
       [yY])
@@ -311,8 +318,9 @@ collectPersonalData() {
   write     "    4) Machine-to-machine"
   write     "    5) Other"
   write     "    *) Stop bugging me"
+  echo -n "> "
   read purpose trash
-  if [ -n "$purpose" ] && [[ $yournumber =~ '^[1-6]+$' ]]; then
+  if [ -n $purpose ] && [[ $purpose -ge 1 ]] && [[ $purpose -le 5 ]]; then
     case "$purpose" in
       1) purpose="IoT" ;;
       2) purpose="Web" ;;
@@ -320,19 +328,26 @@ collectPersonalData() {
       4) purpose="Machine-to-machine" ;;
       5) purpose="Other" ;;
     esac
+    echo
     writeBold "[❓] Would you like us to reach you to have your feedback on Kuzzle? (y/N)"
     write     "    We will be really discreet (and this will help us a lot improving Kuzzle)"
+    echo -n "> "
     while [[ "$agreeOnPersonalData" != [yYnN] ]]
     do
       read agreeOnPersonalData trash
       case "$agreeOnPersonalData" in
         [yY])
-          promptBold "    What's your email address?${NORMAL} (press Enter to skip)"
+          echo
+          writeBold "[❓] What's your email address?${NORMAL} (press Enter to skip)"
+          echo -n "> "
           read email trash
-          promptBold "    What's your full name?${NORMAL} (press Enter to skip)"
-          read firstName lastName otherName yetAnotherName trash
+          echo
+          writeBold "[❓] What's your full name?${NORMAL} (press Enter to skip)"
+          echo -n "> "
+          read name
           echo
           writeBold "$GREEN" "[✔] Thanks a lot!"
+          echo
           ;;
         [nN] | '')
           writeBold "$BLUE" "Ok."
@@ -349,7 +364,7 @@ collectPersonalData() {
     echo
     purpose="Stop bugging me"
   fi
-  $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$firstName $lastName $otherName $yetAnotherName"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
+  $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$name"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
 }
 
 startKuzzle() {
@@ -359,22 +374,44 @@ startKuzzle() {
   if [ -z $DL_BIN ]; then
     failDL
   else
-    writeBold "[ℹ] Downloading Kuzzle launch file..."
+    write "[ℹ] Downloading Kuzzle launch file..."
     $DL_BIN $DL_OPTS $composerYMLURL > $composerYMLPath
   fi
+
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
+
+  echo
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
   writeBold          "    manually using Docker Compose."
   write              "    To manually launch Kuzzle you can type the following command:"
   write              "    docker-compose -f $composerYMLPath up"
+
+  echo
+  writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
+  write      "    If you never have started kuzzle, it will be pulled automatically"
+  echo -n "> "
+  read pullLatest trash
+  case "$pullLatest" in
+    [yY])
+      echo
+      write "[ℹ] Pulling latest version Kuzzle..."
+      $(command -v docker-compose) -f $composerYMLPath pull &> /dev/null
+      writeBold "$GREEN" "[✔] Done."
+      ;;
+    *)
+      writeBold "$BLUE" "Ok."
+      ;;
+  esac
+
   while [[ "$launchTheStack" != [yYnN] ]]; do
     echo
-    promptBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
+    writeBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
+    echo -n "> "
     read launchTheStack trash
     case "$launchTheStack" in
       [yY])
         echo
-        writeBold "[ℹ] Starting Kuzzle..."
+        write "[ℹ] Starting Kuzzle..."
         $(command -v docker-compose) -f $composerYMLPath up -d &> /dev/null
         isKuzzleRunning
         ;;
@@ -392,7 +429,7 @@ startKuzzle() {
 }
 
 isKuzzleRunning() {
-  promptBold "[ℹ] Checking that everything is running"
+  write "[ℹ] Checking that everything is running"
 
   while ! curl -f -s -o /dev/null "http://localhost:7512"
   do
