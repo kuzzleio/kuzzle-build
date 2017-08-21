@@ -312,7 +312,7 @@ collectPersonalData() {
   write     "    5) Other"
   write     "    *) Stop bugging me"
   read purpose trash
-  if [ -n "$purpose" ] && [[ $yournumber =~ '^[1-6]+$' ]]; then
+  if [ -n "$purpose" ] && [[ $purpose =~ '^[1-6]+$' ]]; then
     case "$purpose" in
       1) purpose="IoT" ;;
       2) purpose="Web" ;;
