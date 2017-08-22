@@ -20,7 +20,31 @@ OS_IS_SUPPORTED=0
 DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
 ANALYTICS_URL="http://analytics.kuzzle.io/"
 GITTER_URL="https://gitter.im/kuzzleio/kuzzle"
+COMPOSER_YML_URL="http://kuzzle.io/docker-compose.yml"
 SUPPORT_MAIL="support@kuzzle.io"
+KUZZLE_DIR="${HOME}/.kuzzle"
+COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
+FIRST_INSTALL=0
+
+if [ ! -d $KUZZLE_DIR ]; then
+  mkdir $KUZZLE_DIR;
+fi
+
+if [ ! -f "${KUZZLE_DIR}/uid" ]; then
+  echo $(LC_CTYPE=C tr -dc A-Fa-f0-9 < /dev/urandom | fold -w ${1:-64} | head -n 1) > "${KUZZLE_DIR}/uid"
+  FIRST_INSTALL=1
+fi
+
+UUID=$(cat "${KUZZLE_DIR}/uid")
+
+trap abortSetup INT
+
+function abortSetup() {
+  if [ ! -z $DL_BIN ]; then
+    $DL_BIN $UL_OPTS '{"type": "abort-setup", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
+  fi
+  exit 1
+}
 
 # Output a text with the selected color (reinit to normal at the end)
 write() {
@@ -119,7 +143,7 @@ isOSSupported()
                   writeBold "[❓] Ok. What is your email address?"
                   echo -n "> "
                   read email trash
-                  $DL_BIN $UL_OPTS '{"type": "failed-attempt", "os": "'$CURRENT_OS'", "email": "'$email'"}' $ANALYTICS_URL &> /dev/null
+                  $DL_BIN $UL_OPTS '{"type": "notify-when-os-supported", "uid": "'$UUID'", "os": "'$CURRENT_OS'", "email": "'$email'"}' $ANALYTICS_URL &> /dev/null
                   ;;
                 *)
                   echo
@@ -364,18 +388,20 @@ collectPersonalData() {
     echo
     purpose="Stop bugging me"
   fi
-  $DL_BIN $UL_OPTS '{"type": "collected-data", "email": "'$email'", "name": "'"$name"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
+  $DL_BIN $UL_OPTS '{"type": "collected-data", "uid": "'$UUID'", "email": "'$email'", "name": "'"$name"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
 }
 
 startKuzzle() {
   echo
-  composerYMLURL="http://kuzzle.io/docker-compose.yml"
-  composerYMLPath="kuzzle-docker-compose.yml"
+  if [ ! -f $COMPOSER_YML_PATH ]; then
+    $DL_BIN $UL_OPTS '{"type": "first-download", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
+  fi
+
   if [ -z $DL_BIN ]; then
     failDL
   else
     write "[ℹ] Downloading Kuzzle launch file..."
-    $DL_BIN $DL_OPTS $composerYMLURL > $composerYMLPath
+    $DL_BIN $DL_OPTS $COMPOSER_YML_URL > $COMPOSER_YML_PATH
   fi
 
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
@@ -384,7 +410,7 @@ startKuzzle() {
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
   writeBold          "    manually using Docker Compose."
   write              "    To manually launch Kuzzle you can type the following command:"
-  write              "    docker-compose -f $composerYMLPath up"
+  write              "    docker-compose -f $COMPOSER_YML_PATH up"
 
   echo
   writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
@@ -395,8 +421,10 @@ startKuzzle() {
     [yY])
       echo
       write "[ℹ] Pulling latest version Kuzzle..."
-      $(command -v docker-compose) -f $composerYMLPath pull &> /dev/null
+      $DL_BIN $UL_OPTS '{"type": "pulling-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
+      $(command -v docker-compose) -f $COMPOSER_YML_PATH pull &> /dev/null
       writeBold "$GREEN" "[✔] Done."
+      $DL_BIN $UL_OPTS '{"type": "pulled-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
       ;;
     *)
       writeBold "$BLUE" "Ok."
@@ -412,7 +440,8 @@ startKuzzle() {
       [yY])
         echo
         write "[ℹ] Starting Kuzzle..."
-        $(command -v docker-compose) -f $composerYMLPath up -d &> /dev/null
+        $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
+        $DL_BIN $UL_OPTS '{"type": "starting-kuzzle", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
         isKuzzleRunning
         ;;
       [nN] | '')
@@ -450,9 +479,11 @@ isKuzzleRunning() {
     echo
     write     "Sorry for the inconvenience."
     echo
+    $DL_BIN $UL_OPTS '{"type": "kuzzle-failed-running", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
     exit 8
   else
     writeBold "$GREEN" "[✔] Kuzzle is running!"
+    $DL_BIN $UL_OPTS '{"type": "kuzzle-running", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
   fi
 }
 
@@ -460,15 +491,15 @@ shortHelp() {
   echo
   writeBold "* You can open this short help by calling ./setup.sh --help"
   writeBold "* You can start Kuzzle by typing:"
-  write "  docker-compose -f $composerYMLPath up -d"
+  write "  docker-compose -f $COMPOSER_YML_PATH up -d"
   writeBold "* You can see the logs of the Kuzzle stack by typing:"
-  write "  docker-compose -f $composerYMLPath logs -f"
+  write "  docker-compose -f $COMPOSER_YML_PATH logs -f"
   writeBold "* You can check if everything is working by typing:"
   write "  curl -XGET http://localhost:7512/"
   writeBold "* You can stop Kuzzle by typing:"
-  write "  docker-compose -f $composerYMLPath stop"
+  write "  docker-compose -f $COMPOSER_YML_PATH stop"
   writeBold "* You can restart Kuzzle by typing:"
-  write "  docker-compose -f $composerYMLPath restart"
+  write "  docker-compose -f $COMPOSER_YML_PATH restart"
   writeBold "* You can read the docs at http://docs.kuzzle.io/"
   echo
 }
@@ -628,6 +659,8 @@ if [[ "$SETUP_MAP_COUNT" == 1 ]]; then
   writeBold "$YELLOW" "[ℹ] vm.max_map_count needs to be set at least to $REQUIRED_MAP_COUNT."
   setupMapCount
 fi
+
+$DL_BIN $UL_OPTS '{"type": "start-setup", "uid": "'$UUID'", "first-install": "'$FIRST_INSTALL'"}' $ANALYTICS_URL &> /dev/null
 
 echo
 writeBold "$GREEN" "[✔] All the requirements are met!"
