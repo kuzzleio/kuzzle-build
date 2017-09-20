@@ -24,6 +24,7 @@ COMPOSER_YML_URL="http://kuzzle.io/docker-compose.yml"
 SUPPORT_MAIL="support@kuzzle.io"
 KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
+VOLUME_DIR="${KUZZLE_DIR}/esdata/"
 FIRST_INSTALL=0
 
 if [ ! -d $KUZZLE_DIR ]; then
@@ -413,14 +414,14 @@ startKuzzle() {
   write              "    docker-compose -f $COMPOSER_YML_PATH up"
 
   echo
-  writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
-  write      "    If you never have started kuzzle, it will be pulled automatically"
+  writeBold "[❓] Do you want to pull the latest version of Kuzzle? (y/N)"
+  write     "    If you never have started kuzzle, it will be pulled automatically"
   echo -n "> "
   read pullLatest trash
   case "$pullLatest" in
     [yY])
       echo
-      write "[ℹ] Pulling latest version Kuzzle..."
+      write "[ℹ] Pulling the latest version of Kuzzle..."
       $DL_BIN $UL_OPTS '{"type": "pulling-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
       $(command -v docker-compose) -f $COMPOSER_YML_PATH pull &> /dev/null
       writeBold "$GREEN" "[✔] Done."
@@ -429,6 +430,31 @@ startKuzzle() {
     *)
       writeBold "$BLUE" "Ok."
       ;;
+  esac
+
+  echo
+  writeBold "[❓] Do you want to create a volume for your persisted data? (y/N)"
+  write     "    Using a volume will avoid losing your persisted data across"
+  write     "    restarts of the Kuzzle stack."
+  write     "    If this is not clear to you, we strongly recommend to answer Yes"
+  write     "    and learn more about how Docker Volumes work: "
+  write     "    https://docs.docker.com/engine/admin/volumes/volumes/"
+  read createVolume trash
+  echo -n "> "
+  case "$createVolume" in
+    [yY])
+      echo
+      writeBold "[❓] Where do you want to store the volume?"
+      write     "    Press enter to select $VOLUME_DIR"
+      echo -n "> "
+      read volumePath trash
+      if [ -z ${volumePath} ]; then
+        volumePath=$VOLUME_DIR
+      fi
+      awk '/docker.elastic.co/ { print; print "    volumes:"; print "      - '$volumePath':/usr/share/elasticsearch/data"; next }1' $COMPOSER_YML_PATH > $COMPOSER_YML_PATH
+      ;;
+    *)
+      writeBold "$BLUE" "Ok."
   esac
 
   while [[ "$launchTheStack" != [yYnN] ]]; do
