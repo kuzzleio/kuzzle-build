@@ -24,7 +24,9 @@ COMPOSER_YML_URL="http://kuzzle.io/docker-compose.yml"
 SUPPORT_MAIL="support@kuzzle.io"
 KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
+README_PATH="${KUZZLE_DIR}/README"
 FIRST_INSTALL=0
+HAS_GROUP_DOCKER="$(groups | grep docker)"
 
 if [ ! -d $KUZZLE_DIR ]; then
   mkdir $KUZZLE_DIR;
@@ -49,6 +51,10 @@ function abortSetup() {
 # Output a text with the selected color (reinit to normal at the end)
 write() {
   echo -e " $1$2" "$NORMAL"
+}
+
+writeLnFile() {
+  echo "$1" >> $README_PATH
 }
 
 writeBold() {
@@ -177,13 +183,18 @@ installDL() {
     read installDL trash
     case $installDL in
       [yY])
+        if [ $EUID != 0 ]; then
+          write "[ℹ] Installing cUrl needs root privileges."
+          write "    Since you are not running this script with root privileges"
+          write "    you are likely to be prompted for your sudo password."
+        fi
         echo
         if commandExists apt-get; then
-          apt-get -y install curl
+          sudo apt-get -y install curl
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         elif commandExists yum; then
-          yum install curl
+          sudo yum install curl
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         else
@@ -238,17 +249,31 @@ installDocker() {
   do
     echo
     writeBold "[❓] Do you want to install Docker now? (y/N)"
+    if [ $EUID != 0 ]; then
+      write "    Installing Docker needs root privileges."
+      write "    Since you are not running this script with root privileges"
+      write "    you are likely to be prompted for your sudo password."
+    fi
     echo -n "> "
     read installDocker trash
-    echo
     case $installDocker in
       [yY])
         if [ -z $DL_BIN ]; then
           failDL
         else
           writeBold "[ℹ] Installing Docker..."
-          $DL_BIN $DL_OPTS https://get.docker.com/ | sh
-          writeBold "$GREEN" "[✔] Docker successfully installed."
+          echo
+          sudo $DL_BIN $DL_OPTS https://get.docker.com/ | sudo sh
+          if [ $? -eq 0 ]; then
+            writeBold "$GREEN" "[✔] Docker successfully installed."
+          else
+            echo
+            writeBold "$RED" "[✖] Ooops! Docker installation failed."
+            write            "    Something has gone wrong installing docker."
+            write            "    Please, refer to https://docs.docker.com/engine/installation/"
+            echo
+            exit $?
+          fi
         fi
         ;;
       [nN] | '')
@@ -270,17 +295,23 @@ installDockerCompose() {
   do
     echo
     writeBold "[❓] Do you want to install Docker Compose now? (y/N)"
+    if [ $EUID != 0 ]; then
+      write "    Installing Docker Compose needs root privileges."
+      write "    Since you are not running this script with root privileges"
+      write "    you are likely to be prompted for your sudo password."
+    fi
     echo -n "> "
     read installDockerCompose trash
-    echo
     case "$installDockerCompose" in
       [yY])
         if [ -z $DL_BIN ]; then
           failDL
         else
-          writeBold "Installing Docker Compose..."
-          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > $DOCKER_COMPOSE_BIN
-          chmod +x $DOCKER_COMPOSE_BIN
+          writeBold "[ℹ] Installing Docker Compose..."
+          echo
+          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > /tmp/docker-compose
+          sudo mv /tmp/docker-compose $DOCKER_COMPOSE_BIN
+          sudo chmod +x $DOCKER_COMPOSE_BIN
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         fi
         ;;
@@ -304,18 +335,23 @@ setupMapCount() {
   do
     echo
     writeBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
+    if [ $EUID != 0 ]; then
+      write "[ℹ] Installing Docker Compose needs root privileges."
+      write "    Since you are not running this script with root privileges"
+      write "    you are likely to be prompted for your sudo password."
+    fi
     echo -n "> "
     read setVmParam trash
     case "$setVmParam" in
       [yY])
-        echo
         writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
-        sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
+        echo
+        sudo sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
         if [ -z "$MAP_COUNT" ]; then
-          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
+          sudo echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
         else
           sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
-          mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
+          sudo mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
         fi
         writeBold "$GREEN" "[✔] Kernel variable successfully set."
         ;;
@@ -405,42 +441,32 @@ startKuzzle() {
   fi
 
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
-
   echo
   writeBold          "    This script can launch Kuzzle automatically or you can do it"
   writeBold          "    manually using Docker Compose."
   write              "    To manually launch Kuzzle you can type the following command:"
   write              "    docker-compose -f $COMPOSER_YML_PATH up"
 
-  echo
-  writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
-  write      "    If you never have started kuzzle, it will be pulled automatically"
-  echo -n "> "
-  read pullLatest trash
-  case "$pullLatest" in
-    [yY])
-      echo
-      write "[ℹ] Pulling latest version Kuzzle..."
-      $DL_BIN $UL_OPTS '{"type": "pulling-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
-      $(command -v docker-compose) -f $COMPOSER_YML_PATH pull &> /dev/null
-      writeBold "$GREEN" "[✔] Done."
-      $DL_BIN $UL_OPTS '{"type": "pulled-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
-      ;;
-    *)
-      writeBold "$BLUE" "Ok."
-      ;;
-  esac
+  # pullKuzzle()
 
   while [[ "$launchTheStack" != [yYnN] ]]; do
     echo
-    writeBold "[❓] Do you want to automatically start Kuzzle now? (y/N) "
+    writeBold "[❓] Do you want to start Kuzzle now? (y/N) "
+    if [ -n $HAS_GROUP_DOCKER ]; then
+      write "    You might be prompted for your password since you are not"
+      write "    included in the docker group."
+    fi
     echo -n "> "
     read launchTheStack trash
     case "$launchTheStack" in
       [yY])
         echo
-        write "[ℹ] Starting Kuzzle..."
-        $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
+        write "[ℹ] Starting Kuzzle (this may take up to a minute)..."
+        if [ -n $HAS_GROUP_DOCKER ]; then
+          sudo $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
+        else
+          $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
+        fi
         $DL_BIN $UL_OPTS '{"type": "starting-kuzzle", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
         isKuzzleRunning
         ;;
@@ -457,11 +483,50 @@ startKuzzle() {
   done
 }
 
-isKuzzleRunning() {
-  write "[ℹ] Checking that everything is running"
+pullKuzzle() {
+  echo
+  writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
+  if [ -n $HAS_GROUP_DOCKER ]; then
+    write "    You might be prompted for your password since you are not"
+    write "    included in the docker group."
+  fi
+  echo -n "> "
+  read pullLatest trash
+  case "$pullLatest" in
+    [yY])
+      echo
+      write "[ℹ] Pulling latest version Kuzzle..."
+      $DL_BIN $UL_OPTS '{"type": "pulling-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
+      if [ -n $HAS_GROUP_DOCKER ]; then
+        sudo $(command -v docker-compose) -f $COMPOSER_YML_PATH pull
+      else
+        $(command -v docker-compose) -f $COMPOSER_YML_PATH pull
+      fi
+      if [ $? -eq 0 ]; then
+        writeBold "$GREEN" "[✔] Done."
+      else
+        echo
+        writeBold "$RED" "[✖] Ooops! Pulling Kuzzle has failed."
+        write            "    Try doing it manually and check the errors"
+        write            "    docker-compose -f $COMPOSER_YML_PATH up"
+        echo
+        exit $?
+      fi
 
-  while ! curl -f -s -o /dev/null "http://localhost:7512"
+      $DL_BIN $UL_OPTS '{"type": "pulled-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
+      ;;
+    *)
+      writeBold "$BLUE" "Ok."
+      ;;
+  esac
+}
+
+isKuzzleRunning() {
+  CONNECTION_TRIES=0
+  echo -n " "
+  while ! curl -f -s -o /dev/null "http://localhost:7512" && [ $CONNECTION_TRIES -lt 30 ]
   do
+    CONNECTION_TRIES=$(($CONNECTION_TRIES + 1))
     echo -n "."
     sleep 2
   done
@@ -477,7 +542,10 @@ isKuzzleRunning() {
     writeBold "$YELLOW" "a mail to $SUPPORT_MAIL or by joining the chat room on"
     writeBold "$YELLOW" "Gitter at $GITTER_URL - We'll be glad to help you."
     echo
-    write     "Sorry for the inconvenience."
+    writeBold "[ℹ] You can also inspect the logs by typing"
+    write     "    docker-compose -f $COMPOSER_YML_PATH logs -f"
+    echo
+    writeBold "$YELLOW" "Sorry for the inconvenience."
     echo
     $DL_BIN $UL_OPTS '{"type": "kuzzle-failed-running", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
     exit 8
@@ -489,7 +557,8 @@ isKuzzleRunning() {
 
 shortHelp() {
   echo
-  writeBold "* You can open this short help by calling ./setup.sh --help"
+  writeBold "* You can open this short help by typing"
+  write "  ./setup.sh --help"
   writeBold "* You can start Kuzzle by typing:"
   write "  docker-compose -f $COMPOSER_YML_PATH up -d"
   writeBold "* You can see the logs of the Kuzzle stack by typing:"
@@ -502,6 +571,24 @@ shortHelp() {
   write "  docker-compose -f $COMPOSER_YML_PATH restart"
   writeBold "* You can read the docs at http://docs.kuzzle.io/"
   echo
+}
+
+writeHelpToFile() {
+  echo "" > $README_PATH
+  writeLnFile "# Kuzzle Short Help"
+  writeLnFile "  ================="
+  writeLnFile ""
+  writeLnFile "* You can start Kuzzle by typing:"
+  writeLnFile "  docker-compose -f $COMPOSER_YML_PATH up -d"
+  writeLnFile "* You can see the logs of the Kuzzle stack by typing:"
+  writeLnFile "  docker-compose -f $COMPOSER_YML_PATH logs -f"
+  writeLnFile "* You can check if everything is working by typing:"
+  writeLnFile "  curl -XGET http://localhost:7512/"
+  writeLnFile "* You can stop Kuzzle by typing:"
+  writeLnFile "  docker-compose -f $COMPOSER_YML_PATH stop"
+  writeLnFile "* You can restart Kuzzle by typing:"
+  writeLnFile "  docker-compose -f $COMPOSER_YML_PATH restart"
+  writeLnFile "* You can read the docs at http://docs.kuzzle.io/"
 }
 
 # Main execution routine
@@ -548,27 +635,16 @@ fi
 write "$GREEN" "[✔] Architecture is x86_64."
 
 CHECK_MEM=$(awk '/MemTotal/{print $2}' /proc/meminfo)
-MEM_REQ=4000000
+MEM_REQ=3000000
 if (( "$CHECK_MEM" < "$MEM_REQ" )); then
   echo
-  writeBold "$RED" "[✖] Kuzzle needs at least 4Gb of memory, which does not seem"
-  writeBold "$RED" "    to be the available amount on your system (${CHECK_MEM})."
-  write            "    Sorry, you cannot launch Kuzzle on this machine."
+  writeBold "$YELLOW" "[!] Kuzzle needs at least 3Gb of memory, which does not seem"
+  writeBold "$YELLOW" "    to be the available amount on your system (${CHECK_MEM})."
+  write               "    Performance might be poor."
   echo
-  exit 5
+else
+  write "$GREEN" "[✔] Available memory is at least 3Gb."
 fi
-
-write "$GREEN" "[✔] Available memory is at least 4Gb."
-
-if [ "$EUID" -ne 0 ]; then
-  echo
-  writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
-  write               "    Try typing: sudo $0"
-  echo
-  exit 1
-fi
-
-write "$GREEN" "[✔] Script has root privileges."
 
 if ! commandExists curl && ! commandExists wget; then
   INSTALL_DL=1
@@ -672,3 +748,9 @@ collectPersonalData
 writeBold "# Where do we go from here?"
 writeBold "  ========================="
 shortHelp
+
+echo
+writeBold "[ℹ] This short help has been written to into"
+write     "    $README_PATH"
+writeHelpToFile
+echo
