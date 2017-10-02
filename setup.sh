@@ -27,6 +27,7 @@ COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
 README_PATH="${KUZZLE_DIR}/README"
 FIRST_INSTALL=0
 HAS_GROUP_DOCKER="$(groups | grep docker)"
+SUDO_PREFIX=""
 
 if [ ! -d $KUZZLE_DIR ]; then
   mkdir $KUZZLE_DIR;
@@ -187,14 +188,15 @@ installDL() {
           write "[ℹ] Installing cUrl needs root privileges."
           write "    Since you are not running this script with root privileges"
           write "    you are likely to be prompted for your sudo password."
+          SUDO_PREFIX="sudo "
         fi
         echo
         if commandExists apt-get; then
-          sudo apt-get -y install curl
+          $SUDO_PREFIX apt-get -y install curl
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         elif commandExists yum; then
-          sudo yum install curl
+          $SUDO_PREFIX yum install curl
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         else
@@ -253,6 +255,7 @@ installDocker() {
       write "    Installing Docker needs root privileges."
       write "    Since you are not running this script with root privileges"
       write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo "
     fi
     echo -n "> "
     read installDocker trash
@@ -263,7 +266,7 @@ installDocker() {
         else
           writeBold "[ℹ] Installing Docker..."
           echo
-          sudo $DL_BIN $DL_OPTS https://get.docker.com/ | sudo sh
+          $SUDO_PREFIX $DL_BIN $DL_OPTS https://get.docker.com/ | sudo sh
           if [ $? -eq 0 ]; then
             writeBold "$GREEN" "[✔] Docker successfully installed."
           else
@@ -299,6 +302,7 @@ installDockerCompose() {
       write "    Installing Docker Compose needs root privileges."
       write "    Since you are not running this script with root privileges"
       write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo "
     fi
     echo -n "> "
     read installDockerCompose trash
@@ -310,8 +314,8 @@ installDockerCompose() {
           writeBold "[ℹ] Installing Docker Compose..."
           echo
           $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > /tmp/docker-compose
-          sudo mv /tmp/docker-compose $DOCKER_COMPOSE_BIN
-          sudo chmod +x $DOCKER_COMPOSE_BIN
+          $SUDO_PREFIX mv /tmp/docker-compose $DOCKER_COMPOSE_BIN
+          $SUDO_PREFIX chmod +x $DOCKER_COMPOSE_BIN
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         fi
         ;;
@@ -339,6 +343,7 @@ setupMapCount() {
       write "[ℹ] Installing Docker Compose needs root privileges."
       write "    Since you are not running this script with root privileges"
       write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo "
     fi
     echo -n "> "
     read setVmParam trash
@@ -346,12 +351,12 @@ setupMapCount() {
       [yY])
         writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
         echo
-        sudo sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
+        $SUDO_PREFIX sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
         if [ -z "$MAP_COUNT" ]; then
-          sudo echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
+          $SUDO_PREFIX echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
         else
           sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
-          sudo mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
+          $SUDO_PREFIX mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
         fi
         writeBold "$GREEN" "[✔] Kernel variable successfully set."
         ;;
@@ -481,6 +486,69 @@ startKuzzle() {
         ;;
     esac
   done
+}
+
+installSystemService() {
+  KUZZLE_ETC_PATH="/etc/kuzzle"
+  SYSTEMD_FILE_PATH="/lib/systemd/system/kuzzle.service"
+  if [[ `systemctl` =~ -\.mount ]]; then
+    echo
+    writeBold "[❓] Would you like to install Kuzzle as a system service? (y/N)"
+    write     "    This will enable you to manage Kuzzle with commands like"
+    write     "    service kuzzle start"
+    write     "    service kuzzle stop"
+    write     "    service kuzzle status"
+    if [ $EUID != 0 ]; then
+      write "[ℹ] You will be probably prompted for your password."
+      SUDO_PREFIX="sudo "
+    fi
+    echo -n "> "
+    read systemdService trash
+      case "$systemdService" in
+        [yY])
+          if [ ! -d $KUZZLE_ETC_PATH ]; then
+            $SUDO_PREFIX mkdir $KUZZLE_ETC_PATH
+          fi
+          $SUDO_PREFIX cp $COMPOSER_YML_PATH $KUZZLE_ETC_PATH/docker-compose.yml
+          SERVICE_FILE_CONTENT=$(cat << EndOfMessage
+[Unit]
+Description=Kuzzle
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/etc/kuzzle
+ExecStartPre=-/usr/local/bin/docker-compose kill
+ExecStartPre=-/usr/local/bin/docker-compose rm -f
+ExecStartPre=-/usr/local/bin/docker-compose pull
+ExecStart=/usr/local/bin/docker-compose up
+ExecStop=/usr/local/bin/docker-compose kill
+
+[Install]
+WantedBy=multi-user.target
+EndOfMessage
+)
+          $SUDO_PREFIX tee "$SYSTEMD_FILE_PATH" <<< "$SERVICE_FILE_CONTENT" &> /dev/null
+          $SUDO_PREFIX systemctl enable /lib/systemd/system/kuzzle.service
+          if [ $? -eq 0 ]; then
+            echo
+            writeBold "$GREEN" "[✔] Kuzzle service successfully installed."
+            write     "    Use the following commands to manage Kuzzle"
+            write     "    service kuzzle start"
+            write     "    service kuzzle stop"
+            write     "    service kuzzle status"
+            echo
+            write     "[ℹ] You'll probably need root privileges to use them"
+          else
+            echo
+            writeBold "$RED" "[✖] Ooops! Kuzzle service installation failed."
+          fi
+        ;;
+        *)
+          writeBold "$BLUE" "Ok."
+        ;;
+      esac
+  fi
 }
 
 pullKuzzle() {
@@ -743,6 +811,7 @@ writeBold "$GREEN" "[✔] All the requirements are met!"
 writeBold          "    We are ready to install and start Kuzzle."
 
 startKuzzle
+installSystemService
 collectPersonalData
 
 writeBold "# Where do we go from here?"
