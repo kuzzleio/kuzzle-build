@@ -278,7 +278,7 @@ setupMapCount() {
     echo
     writeBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
     if [ $EUID != 0 ]; then
-      write "[ℹ] Installing Docker Compose needs root privileges."
+      write "[ℹ] Setting vm-max-map-count needs root privileges."
       write "    Since you are not running this script with root privileges"
       write "    you are likely to be prompted for your sudo password."
     fi
