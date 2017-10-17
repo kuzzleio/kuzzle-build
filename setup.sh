@@ -551,9 +551,7 @@ EndOfMessage
             echo
             writeBold "$GREEN" "[✔] Kuzzle service successfully installed."
             write     "    Use the following commands to manage Kuzzle"
-            write     "    service kuzzle start"
-            write     "    service kuzzle stop"
-            write     "    service kuzzle status"
+            write     "    systemctl start|stop|status kuzzle"
             echo
             write     "[ℹ] You'll probably need root privileges to use them"
           else
