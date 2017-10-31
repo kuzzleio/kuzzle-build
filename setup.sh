@@ -26,7 +26,13 @@ KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
 README_PATH="${KUZZLE_DIR}/README"
 FIRST_INSTALL=0
-HAS_GROUP_DOCKER="$(groups | grep docker)"
+
+docker_out=$(docker info 2>&1)
+if [[ $? > 0 ]] && [[ "$docker_out" =~ "^Got permission denied" ]]; then
+  unset HAS_GROUP_DOCKER
+else
+  HAS_GROUP_DOCKER=1
+fi
 
 DL_BIN=$(command -v curl)
 DL_OPTS="-sSL"
@@ -290,7 +296,7 @@ setupMapCount() {
         echo
         sudo sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
         if [ -z "$MAP_COUNT" ]; then
-          sudo echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE
+          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" | sudo tee -a $SYSCTL_CONF_FILE
         else
           sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
           sudo mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
