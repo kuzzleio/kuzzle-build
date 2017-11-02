@@ -26,8 +26,18 @@ KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
 README_PATH="${KUZZLE_DIR}/README"
 FIRST_INSTALL=0
-HAS_GROUP_DOCKER="$(groups | grep docker)"
 SUDO_PREFIX=""
+
+docker_out=$(docker info 2>&1)
+if [[ $? > 0 ]] && [[ "$docker_out" =~ "^Got permission denied" ]]; then
+  unset HAS_GROUP_DOCKER
+else
+  HAS_GROUP_DOCKER=1
+fi
+
+DL_BIN=$(command -v curl)
+DL_OPTS="-sSL"
+UL_OPTS='-H Content-Type:application/json --data'
 
 if [ ! -d $KUZZLE_DIR ]; then
   mkdir $KUZZLE_DIR;
@@ -172,74 +182,11 @@ isOSSupported()
   esac
 }
 
-installDL() {
-  echo
-  writeBold "[ℹ] It is recommended to have cUrl to install Kuzzle. However it"
-  writeBold "    does not seem to be installed on your system."
-  while [[ "$installDL" != [yYnN] ]]
-  do
-    echo
-    writeBold "[❓] Do you want to install cUrl automatically now? (y/N)"
-    echo -n "> "
-    read installDL trash
-    case $installDL in
-      [yY])
-        if [ $EUID != 0 ]; then
-          write "[ℹ] Installing cUrl needs root privileges."
-          write "    Since you are not running this script with root privileges"
-          write "    you are likely to be prompted for your sudo password."
-          SUDO_PREFIX="sudo "
-        fi
-        echo
-        if commandExists apt-get; then
-          $SUDO_PREFIX apt-get -y install curl
-          setDL curl
-          writeBold "$GREEN" "[✔] cUrl successfully installed."
-        elif commandExists yum; then
-          $SUDO_PREFIX yum install curl
-          setDL curl
-          writeBold "$GREEN" "[✔] cUrl successfully installed."
-        else
-          echo
-          writeBold "$YELLOW" "[✖] Sorry, no suitable package manager found."
-          echo
-          exit 8
-        fi
-        ;;
-      [nN] | '')
-        echo
-        writeBold "$BLUE" "Ok."
-        echo
-        ;;
-      *)
-        echo
-        writeBold "$RED" "[✖] Please, answer Y or N."
-        ;;
-    esac
-  done
-}
-
-setDL() {
-  if [ "$1" == 'curl' ]; then
-    DL_BIN=$(command -v curl)
-    DL_OPTS="-sSL"
-    UL_OPTS='-H Content-Type:application/json --data'
-  elif [ "$1" == 'wget' ]; then
-    DL_BIN=$(command -v wget)
-    DL_OPTS="-qO-"
-    UL_OPTS="--header=Content-Type:application/json --post-data="
-  else
-    echo
-    writeBold "$RED" "[✖] something went wrong detecting the downlaoder."
-    exit 10
-  fi
-}
-
 failDL() {
   echo
-  writeBold "$YELLOW" "[✖] curl or wget are necessary to install Kuzzle. However,"
-  writeBold "$YELLOW" "     none of them seems to be available on your system."
-  write               "     Please install curl or wget and re-run this script."
+  writeBold "$YELLOW" "[✖] curl is necessary to install Kuzzle. However,"
+  writeBold "$YELLOW" "     it does not seem to be available on your system."
+  write               "     Please install curl and re-run this script."
   echo
   exit 9
 }
@@ -729,16 +676,11 @@ else
   write "$GREEN" "[✔] Available memory is at least 3Gb."
 fi
 
-if ! commandExists curl && ! commandExists wget; then
-  INSTALL_DL=1
+if ! commandExists curl; then
   write "$YELLOW" "[✖] cUrl is not installed."
   exit 1
 elif commandExists curl; then
-  setDL "curl"
   write "$GREEN" "[✔] cUrl is installed."
-elif commandExists wget; then
-  setDL "wget"
-  write "$GREEN" "[✔] Wget is installed."
 fi
 
 if ! commandExists docker; then
@@ -793,12 +735,6 @@ if [[ "$INSTALL_DOCKER" == 1 || "$INSTALL_DOCKER_COMPOSE" == 1 || "$INSTALL_DL" 
   read trash
   findOSType
   isOSSupported
-fi
-
-if [[ "$INSTALL_DL" == 1 ]]; then
-  echo
-  writeBold "$YELLOW" "[ℹ] cUrl needs to be installed."
-  installDL
 fi
 
 if [[ "$INSTALL_DOCKER" == 1 ]]; then
