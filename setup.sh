@@ -26,6 +26,7 @@ KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
 README_PATH="${KUZZLE_DIR}/README"
 FIRST_INSTALL=0
+SUDO_PREFIX=""
 
 docker_out=$(docker info 2>&1)
 if [[ $? > 0 ]] && [[ "$docker_out" =~ "^Got permission denied" ]]; then
@@ -198,10 +199,12 @@ installDocker() {
     echo
     writeBold "[❓] Do you want to install Docker now? (y/N)"
     if [ $EUID != 0 ]; then
-      write "    Installing Docker needs root privileges."
-      write "    Since you are not running this script with root privileges"
-      write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo"
     fi
+    installDockerCmd="$DL_BIN $DL_OPTS https://get.docker.com/ | $SUDO_PREFIX sh"
+    write "    If you agree, I will run the following command"
+    write "    $installDockerCmd"
+    echo
     echo -n "> "
     read installDocker trash
     case $installDocker in
@@ -211,7 +214,7 @@ installDocker() {
         else
           writeBold "[ℹ] Installing Docker..."
           echo
-          $DL_BIN $DL_OPTS https://get.docker.com/ | sudo sh
+          eval $installDockerCmd
           if [ $? -eq 0 ]; then
             writeBold "$GREEN" "[✔] Docker successfully installed."
           else
@@ -244,10 +247,15 @@ installDockerCompose() {
     echo
     writeBold "[❓] Do you want to install Docker Compose now? (y/N)"
     if [ $EUID != 0 ]; then
-      write "    Installing Docker Compose needs root privileges."
-      write "    Since you are not running this script with root privileges"
-      write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo"
     fi
+    installDockerComposeCmd_1="$DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > /tmp/docker-compose"
+    installDockerComposeCmd_2="$SUDO_PREFIX mv /tmp/docker-compose $DOCKER_COMPOSE_BIN"
+    installDockerComposeCmd_3="$SUDO_PREFIX chmod +x $DOCKER_COMPOSE_BIN"
+    write "    If you agree, I will run the following commands"
+    write "    $installDockerComposeCmd_1"
+    write "    $installDockerComposeCmd_2"
+    write "    $installDockerComposeCmd_3"
     echo -n "> "
     read installDockerCompose trash
     case "$installDockerCompose" in
@@ -257,9 +265,9 @@ installDockerCompose() {
         else
           writeBold "[ℹ] Installing Docker Compose..."
           echo
-          $DL_BIN $DL_OPTS "https://github.com/docker/compose/releases/download/1.12.0/docker-compose-$(uname -s)-$(uname -m)" > /tmp/docker-compose
-          sudo mv /tmp/docker-compose $DOCKER_COMPOSE_BIN
-          sudo chmod +x $DOCKER_COMPOSE_BIN
+          eval $installDockerComposeCmd_1
+          eval $installDockerComposeCmd_2
+          eval $installDockerComposeCmd_3
           writeBold "$GREEN" "[✔] Docker Compose successfully installed."
         fi
         ;;
@@ -284,23 +292,29 @@ setupMapCount() {
     echo
     writeBold "[❓] Do you want to set the vm.max_map_count now? (y/N) "
     if [ $EUID != 0 ]; then
-      write "[ℹ] Setting vm-max-map-count needs root privileges."
-      write "    Since you are not running this script with root privileges"
-      write "    you are likely to be prompted for your sudo password."
+      SUDO_PREFIX="sudo"
     fi
+    setMapCmd_1="$SUDO_PREFIX sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT"
+    if [ -z "$MAP_COUNT" ]; then
+      setMapCmd_2="$SUDO_PREFIX echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE"
+      setMapCmd_3=""
+    else
+      setMapCmd_2="sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp"
+      setMapCmd_3="$SUDO_PREFIX mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE"
+    fi
+    write "    If you agree, I will run the following commands"
+    write "    $setMapCmd_1"
+    write "    $setMapCmd_2"
+    write "    $setMapCmd_3"
     echo -n "> "
     read setVmParam trash
     case "$setVmParam" in
       [yY])
         writeBold "Setting kernel variable vm.max_map_count to $REQUIRED_MAP_COUNT..."
         echo
-        sudo sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT
-        if [ -z "$MAP_COUNT" ]; then
-          echo "vm.max_map_count=$REQUIRED_MAP_COUNT" | sudo tee -a $SYSCTL_CONF_FILE
-        else
-          sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp
-          sudo mv ${TMPDIR-/tmp}/sysctl.tmp $SYSCTL_CONF_FILE
-        fi
+        eval $setMapCmd_1
+        eval $setMapCmd_2
+        eval $setMapCmd_3
         writeBold "$GREEN" "[✔] Kernel variable successfully set."
         ;;
       [nN] | '')
@@ -429,6 +443,74 @@ startKuzzle() {
         ;;
     esac
   done
+}
+
+installSystemService() {
+  KUZZLE_OPT_PATH="/opt/kuzzle"
+  SYSTEMD_FILE_PATH="/lib/systemd/system/kuzzle.service"
+  if [[ `systemctl` =~ -\.mount ]]; then
+    echo
+    writeBold "[❓] Would you like to install Kuzzle as a systemd service? (y/N)"
+    if [ $EUID != 0 ]; then
+      SUDO_PREFIX="sudo"
+    fi
+    if [ ! -d $KUZZLE_OPT_PATH ]; then
+      systemServCmd_1="$SUDO_PREFIX mkdir $KUZZLE_OPT_PATH"
+    fi
+    systemServCmd_2="$SUDO_PREFIX cp $COMPOSER_YML_PATH $KUZZLE_OPT_PATH/docker-compose.yml"
+    systemServCmd_3="$SUDO_PREFIX systemctl enable $SYSTEMD_FILE_PATH"
+    write "   If you agree, I will execute the following commands"
+    if [ ! -z "$systemServCmd_1" ]; then
+      write "   $systemServCmd_1"
+    fi
+    write "   $systemServCmd_2"
+    write "   Then, I will create a systemd file in $SYSTEMD_FILE_PATH and enable it"
+    write "   $systemServCmd_3"
+    echo -n "> "
+    read systemdService trash
+      case "$systemdService" in
+        [yY])
+          if [ ! -z "$systemServCmd_1" ]; then
+            eval $systemServCmd_1
+          fi
+          eval $systemServCmd_2
+          SERVICE_FILE_CONTENT=$(cat << EndOfMessage
+[Unit]
+Description=Kuzzle
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=$KUZZLE_OPT_PATH
+ExecStartPre=-/usr/local/bin/docker-compose kill
+ExecStartPre=-/usr/local/bin/docker-compose rm -f
+ExecStartPre=-/usr/local/bin/docker-compose pull
+ExecStart=/usr/local/bin/docker-compose up
+ExecStop=/usr/local/bin/docker-compose kill
+
+[Install]
+WantedBy=multi-user.target
+EndOfMessage
+)
+          $SUDO_PREFIX tee "$SYSTEMD_FILE_PATH" <<< "$SERVICE_FILE_CONTENT" &> /dev/null
+          eval $systemServCmd_3
+          if [ $? -eq 0 ]; then
+            echo
+            writeBold "$GREEN" "[✔] Kuzzle service successfully installed."
+            write     "    Use the following commands to manage Kuzzle"
+            write     "    systemctl start|stop|status kuzzle"
+            echo
+            write     "[ℹ] You'll probably need root privileges to use them"
+          else
+            echo
+            writeBold "$RED" "[✖] Ooops! Kuzzle service installation failed."
+          fi
+        ;;
+        *)
+          writeBold "$BLUE" "Ok."
+        ;;
+      esac
+  fi
 }
 
 pullKuzzle() {
@@ -680,6 +762,7 @@ writeBold "$GREEN" "[✔] All the requirements are met!"
 writeBold          "    We are ready to install and start Kuzzle."
 
 startKuzzle
+installSystemService
 collectPersonalData
 
 writeBold "# Where do we go from here?"
