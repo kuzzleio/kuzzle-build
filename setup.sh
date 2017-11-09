@@ -20,7 +20,7 @@ OS_IS_SUPPORTED=0
 DOCKER_COMPOSE_BIN=/usr/local/bin/docker-compose
 ANALYTICS_URL="http://analytics.kuzzle.io/"
 GITTER_URL="https://gitter.im/kuzzleio/kuzzle"
-COMPOSER_YML_URL="http://kuzzle.io/docker-compose.yml"
+COMPOSER_YML_URL="https://raw.githubusercontent.com/kuzzleio/kuzzle-build/master/docker-compose/kuzzle-docker-compose.yml"
 SUPPORT_MAIL="support@kuzzle.io"
 KUZZLE_DIR="${HOME}/.kuzzle"
 COMPOSER_YML_PATH="${KUZZLE_DIR}/docker-compose.yml"
@@ -29,9 +29,11 @@ FIRST_INSTALL=0
 SUDO_PREFIX=""
 
 docker_out=$(docker info 2>&1)
-if [[ $? > 0 ]] && [[ "$docker_out" =~ "^Got permission denied" ]]; then
+if [[ "$?" -gt "0" ]]; then
+  # echo NOT_HAZ_GROUP_DOCKER
   unset HAS_GROUP_DOCKER
 else
+  # echo HAZ_GROUP_DOCKER
   HAS_GROUP_DOCKER=1
 fi
 
@@ -296,7 +298,7 @@ setupMapCount() {
     fi
     setMapCmd_1="$SUDO_PREFIX sysctl -w vm.max_map_count=$REQUIRED_MAP_COUNT"
     if [ -z "$MAP_COUNT" ]; then
-      setMapCmd_2="$SUDO_PREFIX echo "vm.max_map_count=$REQUIRED_MAP_COUNT" >> $SYSCTL_CONF_FILE"
+      setMapCmd_2="echo "vm.max_map_count=$REQUIRED_MAP_COUNT" | $SUDO_PREFIX tee -a $SYSCTL_CONF_FILE"
       setMapCmd_3=""
     else
       setMapCmd_2="sed 's/vm.max_map_count=.+/vm.max_map_count=$REQUIRED_MAP_COUNT/g' > ${TMPDIR-/tmp}/sysctl.tmp"
@@ -398,39 +400,56 @@ startKuzzle() {
   if [ -z $DL_BIN ]; then
     failDL
   else
-    write "[ℹ] Downloading Kuzzle launch file..."
+    writeBold "[ℹ] Downloading Kuzzle launch file..."
     $DL_BIN $DL_OPTS $COMPOSER_YML_URL > $COMPOSER_YML_PATH
   fi
 
+  if [ $? -ne 0 ]; then
+    echo
+    writeBold "$RED" "[✖] Ooops! Something went wrong downloading Kuzzle launch file."
+    write            "    This is probably due to network problems."
+    echo
+    exit $?
+  fi
+
   writeBold "$GREEN" "[✔] The Kuzzle launch file has been successfully downloaded."
-  echo
-  writeBold          "    This script can launch Kuzzle automatically or you can do it"
-  writeBold          "    manually using Docker Compose."
-  write              "    To manually launch Kuzzle you can type the following command:"
-  write              "    docker-compose -f $COMPOSER_YML_PATH up"
+
+  if [ -z $HAS_GROUP_DOCKER ]; then
+    launchKuzzleCmd="sudo $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d"
+  else
+    launchKuzzleCmd="$(command -v docker-compose) -f $COMPOSER_YML_PATH up -d"
+  fi
 
   # pullKuzzle()
 
   while [[ "$launchTheStack" != [yYnN] ]]; do
     echo
-    writeBold "[❓] Do you want to start Kuzzle now? (y/N) "
-    if [ -n $HAS_GROUP_DOCKER ]; then
-      write "    You might be prompted for your password since you are not"
-      write "    included in the docker group."
-    fi
+    writeBold "[❓] Do you want to start Kuzzle now? (y/N)"
+    write "    If you agree, I will execute the following command"
+    write "    $launchKuzzleCmd"
     echo -n "> "
     read launchTheStack trash
     case "$launchTheStack" in
       [yY])
         echo
-        write "[ℹ] Starting Kuzzle (this may take up to a minute)..."
-        if [ -n $HAS_GROUP_DOCKER ]; then
-          sudo $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
-        else
-          $(command -v docker-compose) -f $COMPOSER_YML_PATH up -d &> /dev/null
-        fi
+        writeBold "[ℹ] Starting Kuzzle..."
+        write "    (be patient, this may take a while)"
         $DL_BIN $UL_OPTS '{"type": "starting-kuzzle", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
-        isKuzzleRunning
+        echo
+        eval $launchKuzzleCmd
+        if [ $? -eq 0 ]; then
+          isKuzzleRunning
+        else
+          echo
+          writeBold "$RED" "[✖] Ooops! Something went wrong starting Kuzzle."
+          write            "    You can try to execute manually the following command"
+          write            "    $launchKuzzleCmd"
+          write            "    and take a look at the output."
+          echo
+          write            "    Feel free to join us on Gitter at $GITTER_URL to report this problem."
+          echo
+          exit $?
+        fi
         ;;
       [nN] | '')
         echo
@@ -516,7 +535,7 @@ EndOfMessage
 pullKuzzle() {
   echo
   writeBold "[❓] Do you want to pull the latest version of Kuzzle now? (y/N)"
-  if [ -n $HAS_GROUP_DOCKER ]; then
+  if [ -z $HAS_GROUP_DOCKER ]; then
     write "    You might be prompted for your password since you are not"
     write "    included in the docker group."
   fi
@@ -527,7 +546,7 @@ pullKuzzle() {
       echo
       write "[ℹ] Pulling latest version Kuzzle..."
       $DL_BIN $UL_OPTS '{"type": "pulling-latest-containers", "uid": "'$UUID'"}' $ANALYTICS_URL &> /dev/null
-      if [ -n $HAS_GROUP_DOCKER ]; then
+      if [ -z $HAS_GROUP_DOCKER ]; then
         sudo $(command -v docker-compose) -f $COMPOSER_YML_PATH pull
       else
         $(command -v docker-compose) -f $COMPOSER_YML_PATH pull
@@ -759,7 +778,8 @@ $DL_BIN $UL_OPTS '{"type": "start-setup", "uid": "'$UUID'", "first-install": "'$
 
 echo
 writeBold "$GREEN" "[✔] All the requirements are met!"
-writeBold          "    We are ready to install and start Kuzzle."
+promptBold "$BLUE" "    Press Enter to install and start Kuzzle."
+read proceedInstall
 
 startKuzzle
 installSystemService
