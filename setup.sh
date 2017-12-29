@@ -165,6 +165,17 @@ isOSSupported()
   esac
 }
 
+exitIfNotRoot()
+{
+  if [ "$EUID" -ne 0 ]; then
+    echo
+    writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges to be able to perform an install on your system"
+    write               "    Try typing: sudo $0"
+    echo
+    exit 1
+  fi
+}
+
 installDL() {
   echo
   writeBold "[ℹ] It is recommended to have cUrl to install Kuzzle. However it"
@@ -177,13 +188,22 @@ installDL() {
     read installDL trash
     case $installDL in
       [yY])
+        exitIfNotRoot
         echo
         if commandExists apt-get; then
           apt-get -y install curl
+          if [ $? -ne 0 ]; then
+            echo "$YELLOW" "[✖] Could not install cUrl."
+            exit 1
+          fi
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         elif commandExists yum; then
           yum install curl
+          if [ $? -ne 0 ]; then
+            echo "$YELLOW" "[✖] Could not install cUrl."
+            exit 1
+          fi
           setDL curl
           writeBold "$GREEN" "[✔] cUrl successfully installed."
         else
@@ -243,6 +263,7 @@ installDocker() {
     echo
     case $installDocker in
       [yY])
+        exitIfNotRoot
         if [ -z $DL_BIN ]; then
           failDL
         else
@@ -275,6 +296,7 @@ installDockerCompose() {
     echo
     case "$installDockerCompose" in
       [yY])
+        exitIfNotRoot
         if [ -z $DL_BIN ]; then
           failDL
         else
@@ -335,59 +357,58 @@ setupMapCount() {
 
 collectPersonalData() {
   echo
-  writeBold "[❓] What are you going to use Kuzzle for?"
-  write     "    1) IoT"
-  write     "    2) Web"
-  write     "    3) Mobile"
-  write     "    4) Machine-to-machine"
-  write     "    5) Other"
-  write     "    *) Stop bugging me"
-  echo -n "> "
-  read purpose trash
-  if [ -n $purpose ] && [[ $purpose -ge 1 ]] && [[ $purpose -le 5 ]]; then
-    case "$purpose" in
-      1) purpose="IoT" ;;
-      2) purpose="Web" ;;
-      3) purpose="Mobile" ;;
-      4) purpose="Machine-to-machine" ;;
-      5) purpose="Other" ;;
-    esac
-    echo
-    writeBold "[❓] Would you like us to reach you to have your feedback on Kuzzle? (y/N)"
-    write     "    We will be really discreet (and this will help us a lot improving Kuzzle)"
+  while [[ "$purpose" != [012345] ]]
+  do
+    writeBold "[❓] What are you going to use Kuzzle for?"
+    write     "    1) IoT"
+    write     "    2) Web"
+    write     "    3) Mobile"
+    write     "    4) Machine-to-machine"
+    write     "    5) Other"
+    write     "    0) Stop bugging me"
     echo -n "> "
-    while [[ "$agreeOnPersonalData" != [yYnN] ]]
-    do
-      read agreeOnPersonalData trash
-      case "$agreeOnPersonalData" in
-        [yY])
-          echo
-          writeBold "[❓] What's your email address?${NORMAL} (press Enter to skip)"
-          echo -n "> "
-          read email trash
-          echo
-          writeBold "[❓] What's your full name?${NORMAL} (press Enter to skip)"
-          echo -n "> "
-          read name
-          echo
-          writeBold "$GREEN" "[✔] Thanks a lot!"
-          echo
-          ;;
-        [nN] | '')
-          writeBold "$BLUE" "Ok."
-          agreeOnPersonalData="n"
-          echo
-          ;;
-        *)
-          writeBold "$RED" "[✖] Please, answer Y or N."
-          ;;
-      esac
-    done
-  else
-    writeBold "$BLUE" "Ok."
-    echo
-    purpose="Stop bugging me"
-  fi
+    read purpose trash
+  done
+
+  case "$purpose" in
+    0) purpose="Stop bugging me" ;;
+    1) purpose="IoT" ;;
+    2) purpose="Web" ;;
+    3) purpose="Mobile" ;;
+    4) purpose="Machine-to-machine" ;;
+    5) purpose="Other" ;;
+  esac
+  echo
+  writeBold "[❓] Would you like us to reach you to have your feedback on Kuzzle? (y/N)"
+  write     "    We will be really discreet (and this will help us a lot improving Kuzzle)"
+  echo -n "> "
+  while [[ "$agreeOnPersonalData" != [yYnN] ]]
+  do
+    read agreeOnPersonalData trash
+    case "$agreeOnPersonalData" in
+      [yY])
+        echo
+        writeBold "[❓] What's your email address?${NORMAL} (press Enter to skip)"
+        echo -n "> "
+        read email trash
+        echo
+        writeBold "[❓] What's your full name?${NORMAL} (press Enter to skip)"
+        echo -n "> "
+        read name
+        echo
+        writeBold "$GREEN" "[✔] Thanks a lot!"
+        echo
+        ;;
+      [nN] | '')
+        writeBold "$BLUE" "Ok."
+        agreeOnPersonalData="n"
+        echo
+        ;;
+      *)
+        writeBold "$RED" "[✖] Please, answer Y or N."
+        ;;
+    esac
+  done
   $DL_BIN $UL_OPTS '{"type": "collected-data", "uid": "'$UUID'", "email": "'$email'", "name": "'"$name"'", "purpose": "'"$purpose"'", "os": "'$CURRENT_OS'"}' $ANALYTICS_URL &> /dev/null
 }
 
@@ -560,20 +581,9 @@ fi
 
 write "$GREEN" "[✔] Available memory is at least 4Gb."
 
-if [ "$EUID" -ne 0 ]; then
-  echo
-  writeBold "$YELLOW" "[✖] This script needs to be executed with root privileges."
-  write               "    Try typing: sudo $0"
-  echo
-  exit 1
-fi
-
-write "$GREEN" "[✔] Script has root privileges."
-
 if ! commandExists curl && ! commandExists wget; then
   INSTALL_DL=1
   write "$YELLOW" "[✖] cUrl is not installed."
-  exit 1
 elif commandExists curl; then
   setDL "curl"
   write "$GREEN" "[✔] cUrl is installed."
