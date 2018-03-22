@@ -4,21 +4,25 @@
 KUZZLE_DIR="./kuzzle"
 KUZZLE_DOWNLOAD_MANAGER=""
 KUZZLE_PUSH_ANALYTICS=""
+KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE=""
+KUZZLE_CHECK_CONNECTIVITY_CMD=""
 CURL_OPTS="-sSL"
 CURL_PUSH_OPTS="-H Content-Type:application/json --data "
 WGET_OPTS="-qO-"
-WGET_PUTSH_OPTS="--header=Content-Type:application/json --post-data="
+WGET_PUSH_OPTS=" -O- --header=Content-Type:application/json --post-data="
 #ANALYTICS_URL="http://analytics.kuzzle.io/"
 ANALYTICS_URL="10.35.250.151:3000"
 GITTER_URL="https://gitter.im/kuzzleio/kuzzle"
 SUPPORT_MAIL="support@kuzzle.io"
-COMPOSE_YML_URL="http://kuzzle.io/docker-compose.yml"
+COMPOSE_YML_URL="https://kuzzle.io/docker-compose.yml"
 COMPOSE_YML_PATH=$KUZZLE_DIR/docker-compose.yml
-INSTALL_KUZZLE_WITHOUT_DOCKER_URL="http://docs.kuzzle.io/guide/essentials/installing-kuzzle/#manually"
+INSTALL_KUZZLE_WITHOUT_DOCKER_URL="https://docs.kuzzle.io/guide/essentials/installing-kuzzle/#manually"
 MIN_DOCKER_VER=1.12.0
 MIN_MAX_MAP_COUNT=262144
 CONNECT_TO_KUZZLE_MAX_RETRY=30
-CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in second
+CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
+DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
+DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
 
 # Errors return status
@@ -31,6 +35,7 @@ MIN_MAX_MAP_COUNT_MISMATCH=47
 ERROR_DOWNLOAD_DOCKER_COMPOSE=48
 KUZZLE_NOT_RUNNING_AFTER_INSTALL=49
 
+
 # list of colors
 # see if it supports colors...
 NCOLORS=`tput colors`
@@ -39,6 +44,7 @@ if [ "$NCOLORS" -gt 0 ]; then
   RED=$(tput setaf 1)
   BLUE=$(tput setaf 4)
   NORMAL=$(tput sgr0)
+  GREEN="$(tput setaf 2)"  
 fi
 
 # Create kuzzle workspace directory
@@ -49,25 +55,25 @@ fi
 os_lookup() {
   OSTYPE=$(uname)
   case "$OSTYPE" in
-          "Darwin")
-          {
-              OS="OSX"
-          } ;;    
-          "Linux")
-          {
-              # If available, use LSB to identify distribution
-              if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
-                  DISTRO=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
-              else
-                  DISTRO=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
-              fi
-              OS=$(echo $DISTRO | tr 'a-z' 'A-Z' | tr -d '"')
-          } ;;
-          *) 
-          {
-              OS=OSTYPE
-              exit
-          } ;;
+    "Darwin")
+    {
+        OS="OSX"
+    } ;;    
+    "Linux")
+    {
+        # If available, use LSB to identify distribution
+        if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
+            DISTRO=$(awk -F= '/^NAME/{print $2}' /etc/os-release)
+        else
+            DISTRO=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
+        fi
+        OS=$(echo $DISTRO | tr 'a-z' 'A-Z' | tr -d '"')
+    } ;;
+    *) 
+    {
+        OS=OSTYPE
+        exit
+    } ;;
   esac
 }
 
@@ -78,15 +84,19 @@ command_exists() {
 set_download_manager() {
   if command_exists curl; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v curl) "$CURL_OPTS
-    KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS
+    KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS" "
+    KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} $COMPOSE_YML_URL -o /dev/null"
+    KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v curl) -o /dev/null http://localhost:7512"
     return 0
   elif command_exists wget; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v wget) "$WGET_OPTS
-    KUZZLE_PUSH_ANALYTICS="$(command -v wget) "$WGET_PUSH_OPTS    
+    KUZZLE_PUSH_ANALYTICS="$(command -v wget)"$WGET_PUSH_OPTS
+    KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER --server-response $COMPOSE_YML_URL 2>&1 | awk '/^  HTTP/{print \$2}' | tail -n 1"
+    KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
   (>&2 echo $RED"This script needs curl or wget installed.")
-  (>&2 echo "Please install either one or set the KUZZLE_DOWNLOAD_MANAGER environment variable and re-run this script"$NORMAL)
+  (>&2 echo "Please install either one."$NORMAL)
   exit $NO_DOWNLOAD_MANAGER
 }
 
@@ -134,7 +144,7 @@ prerequisite() {
   if ! command_exists docker; then
     (>&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL)
     (>&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL)
-    $KUZZLE_PUSH_ANALYTICS '{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     exit $NO_DOCKER
   fi
 
@@ -142,93 +152,87 @@ prerequisite() {
   if ! command_exists docker-compose; then
     (>&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please in stall it and re-run this script"$NORMAL)
     (>&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL)
-    $KUZZLE_PUSH_ANALYTICS '{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $NO_DOCKER_COMPOSE
   fi
 
   # Check if docker version is at least $MIN_DOCKER_VER
   vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
   if [ $? -ne 0 ]; then
-    echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL
-    $KUZZLE_PUSH_ANALYTICS '{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+    (>&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL)
+    $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $DOCKER_VERSION_MISMATCH
   fi
 
   # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
   VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
   if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-    echo $RED"The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
-    echo "is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-    echo "In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
-    echo $BLUE$BOLD"sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-    echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-    echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL
-    $KUZZLE_PUSH_ANALYTICS '{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+    (>&2 echo)
+    (>&2 echo $RED"The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})")
+    (>&2 echo "is lower than the required one ($MIN_MAX_MAP_COUNT+).")
+    (>&2 echo "In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)")
+    (>&2 echo $BLUE$BOLD"sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT")
+    (>&2 echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file")
+    (>&2 echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL)
+    $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $MIN_MAX_MAP_COUNT_MISMATCH
   fi
 }
 
-download_docker_compose() {
+download_docker_compose_yml() {
+  local RETRY=0
+
+  echo 
   echo $BLUE"Downloading Kuzzle docker-compose.yml file..."$NORMAL
+
+  TEST=`eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE"`
+  while [ $TEST -ne 200 ];
+    do
+      if [ $RETRY -gt $DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY ]; then
+        (>&2 echo $RED"Cannot download $COMPOSE_YML_URL.")
+        (>&2 echo "Please ensure you have internet or try again later.")
+        (>&2 echo "If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."$NORMAL)
+        $KUZZLE_PUSH_ANALYTICS'{"type": "error-download-dockercomposeyml", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+        exit $ERROR_DOWNLOAD_DOCKER_COMPOSE
+      fi
+      RETRY=$(expr $RETRY + 1)
+      sleep $DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME
+      TEST=`eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE"`
+    done
   $KUZZLE_DOWNLOAD_MANAGER $COMPOSE_YML_URL > $COMPOSE_YML_PATH
-  # TODO Handle http errors
 }
 
 pull_kuzzle() {
   echo "Pulling latest version of Kuzzle from dockerhub"
   echo
-  $KUZZLE_PUSH_ANALYTICS '{"type": "pulling-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+  $KUZZLE_PUSH_ANALYTICS'{"type": "pulling-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
   $(command -v docker-compose) -f $COMPOSE_YML_PATH pull
   RET=$?
   if [ $RET -ne 0 ]; then
-    $KUZZLE_PUSH_ANALYTICS '{"type": "pull-failed", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+    $KUZZLE_PUSH_ANALYTICS'{"type": "pull-failed", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     exit $RET
   fi
   echo $GREEN"Done."$NORMAL
-  $KUZZLE_PUSH_ANALYTICS '{"type": "pulled-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null  
+  $KUZZLE_PUSH_ANALYTICS'{"type": "pulled-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null  
 }
 
 run_kuzzle() {
-  echo "This script can run Kuzzle automatically or you can do it manually using Docker Compose."
-  echo "To manually launch Kuzzle you can type the following command:"
-  echo $BLUE"docker-compose -f $COMPOSE_YML_PATH up"$NORMAL
-
-  while [[ "$ANSWER" != [yYnN] ]]; do
-    echo
-    echo "Do you want to start Kuzzle now? (y/N) "
-    echo -n "> "
-    read ANSWER
-    case "$ANSWER" in
-      [yY])
-        $KUZZLE_PUSH_ANALYTICS '{"type": "starting-kuzzle", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null      
-        echo
-        echo $BLUE"Starting Kuzzle..."$NORMAL
-        $(command -v docker-compose) -f $COMPOSE_YML_PATH up -d
-        ;;
-      [nN] | '')
-        $KUZZLE_PUSH_ANALYTICS '{"type": "did-not-start-kuzzle", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
-        echo
-        echo $BLUE"Exiting."$NORMAL
-        exit 0
-        ;;
-      *)
-        echo
-        (>&2 echo $RED"Please, answer Y or N."$NORMAL)
-        ;;
-    esac
-  done
+  $KUZZLE_PUSH_ANALYTICS'{"type": "starting-kuzzle", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null      
+  echo
+  echo $BLUE"Starting Kuzzle..."$NORMAL
+  $(command -v docker-compose) -f $COMPOSE_YML_PATH up -d
 }
 
 check_kuzzle() {
   local RETRY=0
 
   echo -n $BLUE"Check if Kuzzle is running (timeout "
-  echo "$CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY * $CONNECT_TO_KUZZLE_MAX_RETRY" | bc | tr -d '\n'
+  echo -n $(expr $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY \* $CONNECT_TO_KUZZLE_MAX_RETRY)
   echo " seconds)"$NORMAL
-  while ! curl -f -s -o /dev/null "http://localhost:7512"
+  while ! $KUZZLE_CHECK_CONNECTIVITY_CMD &> /dev/null
     do
     if [ $RETRY -gt $CONNECT_TO_KUZZLE_MAX_RETRY ]; then
-      $KUZZLE_PUSH_ANALYTICS '{"type": "kuzzle-failed-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-failed-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       (>&2 echo)
       (>&2 echo $RED"Ooops! Something went wrong.")
       (>&2 echo "Kuzzle does not seem to respond as expected to requests to")
@@ -244,7 +248,7 @@ check_kuzzle() {
       sleep 2
       RETRY=$(expr $RETRY + 1)
     done
-  $KUZZLE_PUSH_ANALYTICS '{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null        
+  $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null        
   echo
   echo $GREEN"Kuzzle is now running."$NORMAL
   exit 0
@@ -253,7 +257,7 @@ check_kuzzle() {
 ######### MAIN
 
 if [ ! -f "${KUZZLE_DIR}/uid" ]; then
-  echo $(LC_CTYPE=C tr -dc A-Fa-f0-9 < /dev/urandom | fold -w ${1:-64} | head -n 1) > "${KUZZLE_DIR}/.uid"
+  echo $(LC_CTYPE=C tr -dc A-Fa-f0-9 < /dev/urandom | fold -w 64 | head -n 1) > "${KUZZLE_DIR}/.uid"
   FIRST_INSTALL=1
 fi
 
@@ -273,7 +277,8 @@ echo
 
 set_download_manager
 os_lookup
-$KUZZLE_PUSH_ANALYTICS '{"type": "start-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+
+$KUZZLE_PUSH_ANALYTICS'{"type": "start-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
 
 prerequisite
 
@@ -281,15 +286,18 @@ trap abort_setup INT
 
 # send abort-setup event to analytics on SIGINT
 abort_setup() {
-  $KUZZLE_PUSH_ANALYTICS '{"type": "abort-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+  $KUZZLE_PUSH_ANALYTICS'{"type": "abort-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
   exit 1
 }
 
 
-download_docker_compose
+download_docker_compose_yml
 pull_kuzzle
-run_kuzzle
-check_kuzzle
+if [ "$1" != "--no-run" ]; then
+  run_kuzzle
+  check_kuzzle
+fi
+echo $GREEN"Kuzzle successfully installed"$NORMAL
 
 exit 0
 
