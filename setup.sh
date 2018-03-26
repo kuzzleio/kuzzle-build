@@ -94,8 +94,8 @@ set_download_manager() {
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
-  (>&2 echo $RED"This script needs curl or wget installed.")
-  (>&2 echo "Please install either one."$NORMAL)
+  >&2 echo $RED"This script needs curl or wget installed."
+  >&2 echo "Please install either one."$NORMAL
   exit $NO_DOWNLOAD_MANAGER
 }
 
@@ -134,23 +134,23 @@ prerequisite() {
   local ERROR=0
 
   # Check internet connection
-  if ! ping -q -c 1 -W 1 kuzzle.io > /dev/null; then
-    (<&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL)
+  if [ $(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE") -ne 200 ]; then
+    <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
   fi
 
   # Check if docker is installed
   if ! command_exists docker; then
-    (>&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL)
-    (>&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL)
+    >&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
+    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     exit $NO_DOCKER
   fi
 
   # Check if docker-compose is installed
   if ! command_exists docker-compose; then
-    (>&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please in stall it and re-run this script"$NORMAL)
-    (>&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL)
+    >&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please in stall it and re-run this script"$NORMAL
+    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $NO_DOCKER_COMPOSE
   fi
@@ -158,7 +158,7 @@ prerequisite() {
   # Check if docker version is at least $MIN_DOCKER_VER
   vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
   if [ $? -ne 0 ]; then
-    (>&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL)
+    >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL)
     $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $DOCKER_VERSION_MISMATCH
   fi
@@ -166,13 +166,13 @@ prerequisite() {
   # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
   VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
   if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-    (>&2 echo)
-    (>&2 echo $RED"The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})")
-    (>&2 echo "is lower than the required one ($MIN_MAX_MAP_COUNT+).")
-    (>&2 echo "In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)")
-    (>&2 echo $BLUE$BOLD"sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT")
-    (>&2 echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file")
-    (>&2 echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL)
+    >&2 echo
+    >&2 echo $RED"The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
+    >&2 echo "is lower than the required one ($MIN_MAX_MAP_COUNT+)."
+    >&2 echo "In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+    >&2 echo $BLUE$BOLD"sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
+    >&2 echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+    >&2 echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $MIN_MAX_MAP_COUNT_MISMATCH
   fi
@@ -184,13 +184,13 @@ download_docker_compose_yml() {
   echo 
   echo $BLUE"Downloading Kuzzle docker-compose.yml file..."$NORMAL
 
-  TEST=`eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE"`
+  TEST=$(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE")
   while [ $TEST -ne 200 ];
     do
       if [ $RETRY -gt $DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY ]; then
-        (>&2 echo $RED"Cannot download $COMPOSE_YML_URL.")
-        (>&2 echo "Please ensure you have internet or try again later.")
-        (>&2 echo "If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."$NORMAL)
+        >&2 echo $RED"Cannot download $COMPOSE_YML_URL."
+        >&2 echo "Please ensure you have internet or try again later."
+        >&2 echo "If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."$NORMAL
         $KUZZLE_PUSH_ANALYTICS'{"type": "error-download-dockercomposeyml", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
         exit $ERROR_DOWNLOAD_DOCKER_COMPOSE
       fi
@@ -232,11 +232,11 @@ check_kuzzle() {
     do
     if [ $RETRY -gt $CONNECT_TO_KUZZLE_MAX_RETRY ]; then
       $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-failed-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
-      (>&2 echo)
-      (>&2 echo $RED"Ooops! Something went wrong.")
-      (>&2 echo "Kuzzle does not seem to respond as expected to requests to")
-      (>&2 echo "http://localhost:7512"$NORMAL)
-      (>&2 echo)
+      >&2 echo
+      >&2 echo $RED"Ooops! Something went wrong."
+      >&2 echo "Kuzzle does not seem to respond as expected to requests to"
+      >&2 echo "http://localhost:7512"$NORMAL
+      >&2 echo
       echo "Feel free to get in touch with the support team by sending"
       echo "a mail to $SUPPORT_MAIL or by joining the chat room on"
       echo "Gitter at $GITTER_URL - We'll be glad to help you."
