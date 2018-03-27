@@ -134,7 +134,7 @@ prerequisite() {
   local ERROR=0
 
   # Check internet connection
-  if [ $(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE") -ne 200 ]; then
+  if [ $(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE") -ne 200 ]; then
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
   fi
@@ -196,7 +196,7 @@ download_docker_compose_yml() {
       fi
       RETRY=$(expr $RETRY + 1)
       sleep $DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME
-      TEST=`eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE"`
+      TEST=$(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE")
     done
   $KUZZLE_DOWNLOAD_MANAGER $COMPOSE_YML_URL > $COMPOSE_YML_PATH
 }
