@@ -158,7 +158,7 @@ prerequisite() {
   # Check if docker version is at least $MIN_DOCKER_VER
   vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
   if [ $? -ne 0 ]; then
-    >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL)
+    >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $DOCKER_VERSION_MISMATCH
   fi
