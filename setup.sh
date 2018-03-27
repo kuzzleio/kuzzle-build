@@ -149,7 +149,7 @@ prerequisite() {
 
   # Check if docker-compose is installed
   if ! command_exists docker-compose; then
-    >&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please in stall it and re-run this script"$NORMAL
+    >&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
     >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     exit $NO_DOCKER_COMPOSE
