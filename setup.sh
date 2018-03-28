@@ -10,7 +10,7 @@ CURL_OPTS="-sSL"
 CURL_PUSH_OPTS="-H Content-Type:application/json --data "
 WGET_OPTS="-qO-"
 WGET_PUSH_OPTS=" -O- --header=Content-Type:application/json --post-data="
-ANALYTICS_URL="http://analytics.kuzzle.io/"
+ANALYTICS_URL="http://analytics.uat.kuzzle.io/"
 GITTER_URL="https://gitter.im/kuzzleio/kuzzle"
 SUPPORT_MAIL="support@kuzzle.io"
 COMPOSE_YML_URL="https://kuzzle.io/docker-compose.yml"
@@ -325,7 +325,7 @@ if [ "$1" != "--no-run" ]; then
   check_kuzzle
 fi
 echo $GREEN"Kuzzle successfully installed"$NORMAL
-the_end()
+the_end
 
 exit 0
 
