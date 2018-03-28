@@ -200,19 +200,25 @@ download_docker_compose_yml() {
       TEST=$(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE")
     done
   $KUZZLE_DOWNLOAD_MANAGER $COMPOSE_YML_URL > $COMPOSE_YML_PATH
+  echo $GREEN"Downloaded"$NORMAL
+  echo
 }
 
 pull_kuzzle() {
-  echo "Pulling latest version of Kuzzle from dockerhub"
+  echo $BLUE"Pulling latest version of Kuzzle from dockerhub"$NORMAL
   echo
   $KUZZLE_PUSH_ANALYTICS'{"type": "pulling-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
   $(command -v docker-compose) -f $COMPOSE_YML_PATH pull
   RET=$?
   if [ $RET -ne 0 ]; then
     $KUZZLE_PUSH_ANALYTICS'{"type": "pull-failed", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+    >&2 echo
+    >&2 echo $RED"Pull failed. Please ensure your docker is running."
+    >&2 echo "You can try and run docker with service docker start or dockerd."
+    >&2 echo "To know mor please refer to https://docs.docker.com/config/daemon"$NORMAL
     exit $RET
   fi
-  echo $GREEN"Done."$NORMAL
+  echo $GREEN"Pulled"$NORMAL
   $KUZZLE_PUSH_ANALYTICS'{"type": "pulled-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null  
 }
 
@@ -226,7 +232,7 @@ run_kuzzle() {
 check_kuzzle() {
   local RETRY=0
 
-  echo -n $BLUE"Check if Kuzzle is running (timeout "
+  echo -n $BLUE"Checking if Kuzzle is running (timeout "
   echo -n $(expr $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY \* $CONNECT_TO_KUZZLE_MAX_RETRY)
   echo " seconds)"$NORMAL
   while ! $KUZZLE_CHECK_CONNECTIVITY_CMD &> /dev/null
@@ -248,18 +254,21 @@ check_kuzzle() {
       sleep 2
       RETRY=$(expr $RETRY + 1)
     done
-  $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null        
+  $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
+  echo $GREEN"Kuzzle is now running"$NORMAL
+  echo
 }
 
 the_end() {
-  echo "You can start Kuzzle by typing:"
-  echo "docker-compose -f $COMPOSER_YML_PATH up -d"
-  echo "You can see the logs of the Kuzzle stack by typing:"
-  echo "docker-compose -f $COMPOSER_YML_PATH logs -f"
-  echo "You can stop Kuzzle by typing:"
-  echo "docker-compose -f $COMPOSER_YML_PATH stop"
-  echo "You can restart Kuzzle by typing:"
-  echo "docker-compose -f $COMPOSER_YML_PATH restart"
+  echo $BLUE"You can see the logs of the Kuzzle stack by typing:"$NORMAL
+  echo " docker-compose -f $COMPOSE_YML_PATH logs -f"
+  echo $BLUE"You can stop Kuzzle by typing:"$NORMAL
+  echo " docker-compose -f $COMPOSE_YML_PATH stop"
+  echo $BLUE"You can start Kuzzle by typing:"$NORMAL
+  echo " docker-compose -f $COMPOSE_YML_PATH up -d"
+  echo $BLUE"You can restart Kuzzle by typing:"$NORMAL
+  echo " docker-compose -f $COMPOSE_YML_PATH restart"
+  echo
   echo "You can read the docs at http://docs.kuzzle.io/"
 }
 
@@ -325,6 +334,8 @@ if [ "$1" != "--no-run" ]; then
   check_kuzzle
 fi
 echo $GREEN"Kuzzle successfully installed"$NORMAL
+echo
+
 the_end
 
 exit 0
