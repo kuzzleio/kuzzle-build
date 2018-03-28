@@ -290,7 +290,7 @@ echo "  understanding of the installation process."
 echo "* Feel free to join us on Gitter at $GITTER_URL if you need help."
 echo
 
-echo "                              ███████████████████████"
+echo "                                ███████████████████████"
 echo " ██████████████████████████████████████████████████████"
 echo " █                            ▐█     ███  █████     ███"
 echo " █    █  █   █   █  █████    ▐██████ ███  █████  ██████"
