@@ -37,7 +37,7 @@ KUZZLE_NOT_RUNNING_AFTER_INSTALL=49
 
 # list of colors
 # see if it supports colors...
-NCOLORS=`tput colors`
+NCOLORS=$(tput colors)
 if [ "$NCOLORS" -gt 0 ]; then
   BOLD=$(tput bold)
   RED=$(tput setaf 1)
@@ -142,7 +142,8 @@ prerequisite() {
   # Check if docker is installed
   if ! command_exists docker; then
     >&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
-    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
+    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"
+    >&2 echo "Once Docker is installed you will need to start it."$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     exit $NO_DOCKER
   fi
@@ -248,12 +249,27 @@ check_kuzzle() {
       RETRY=$(expr $RETRY + 1)
     done
   $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null        
-  echo
-  echo $GREEN"Kuzzle is now running."$NORMAL
-  exit 0
+}
+
+the_end() {
+  echo "You can start Kuzzle by typing:"
+  echo "docker-compose -f $COMPOSER_YML_PATH up -d"
+  echo "You can see the logs of the Kuzzle stack by typing:"
+  echo "docker-compose -f $COMPOSER_YML_PATH logs -f"
+  echo "You can stop Kuzzle by typing:"
+  echo "docker-compose -f $COMPOSER_YML_PATH stop"
+  echo "You can restart Kuzzle by typing:"
+  echo "docker-compose -f $COMPOSER_YML_PATH restart"
+  echo "You can read the docs at http://docs.kuzzle.io/"
 }
 
 ######### MAIN
+
+if [ "$1" == "--help" ]; then
+  echo "--help     show this help"
+  echo "--no-run   only install Kuzzle, don't run it"
+  exit 1
+fi
 
 if [ ! -f "${KUZZLE_DIR}/uid" ]; then
   echo $(LC_CTYPE=C tr -dc A-Fa-f0-9 < /dev/urandom | fold -w 64 | head -n 1) > "${KUZZLE_DIR}/.uid"
@@ -273,6 +289,18 @@ echo "* You can refer to http://docs.kuzzle.io/ if you need better"
 echo "  understanding of the installation process."
 echo "* Feel free to join us on Gitter at $GITTER_URL if you need help."
 echo
+
+echo "                              ███████████████████████"
+echo " ██████████████████████████████████████████████████████"
+echo " █                            ▐█     ███  █████     ███"
+echo " █    █  █   █   █  █████    ▐██████ ███  █████  ██████"
+echo " █    █ █    █   █      █    ██████ ████  █████    ████"
+echo " █    ██     █   █     █    ▐█████ █████  █████  ██████"
+echo " █    █ █    █   █    █     █████ ██████  █████  ██████"
+echo " █    █ █    █   █   █     ▐████     ███     ██     ███"
+echo " █    █  █    ███   █████  ████████████████████████████"
+echo " █                        ▐████████████████████████████"
+echo " ██████████████████████████"
 
 set_download_manager
 os_lookup
@@ -297,6 +325,7 @@ if [ "$1" != "--no-run" ]; then
   check_kuzzle
 fi
 echo $GREEN"Kuzzle successfully installed"$NORMAL
+the_end()
 
 exit 0
 
