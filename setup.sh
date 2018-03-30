@@ -137,7 +137,7 @@ prerequisite() {
   # Check internet connection
   echo
   echo "Checking internet access..."
-  $(eval "$KUZZLE_CHECK_INTERNET_ACCESS") &> /dev/null
+  $KUZZLE_CHECK_INTERNET_ACCESS &> /dev/null
   if [ $? -ne 0 ]; then
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
