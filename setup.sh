@@ -272,8 +272,7 @@ get_admin_console() {
     echo " Kuzzle Admin Console"
     echo
     echo "Kuzzle Admin Console is a stateless, lightweight Kuzzle client that runs on a web browser." 
-    echo "An up-to-date online version is freely available http://kuzzle-backoffice.netlify.com, but you can* also execute it locally" 
-    echo "(useful if your servers don't have internet access)." 
+    echo "An up-to-date online version is freely available http://kuzzle-backoffice.netlify.com, but you can* also execute it locally." 
     echo "Both the online and the local version of the Kuzzle Admin Console will open a direct and secure client connection between your web browser and your Kuzzle server."
     echo "Data flows only between the web browser and the Kuzzle server and is never transmitted to a third-party."
     echo "Do you want to install the offline Kuzzle Admin Console? (y/N)"
