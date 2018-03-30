@@ -140,9 +140,7 @@ prerequisite() {
   # Check internet connection
   echo
   echo "Checking internet access..."
-  $(eval "$KUZZLE_CHECK_INTERNET_ACCESS") &> /dev/null
-  echo $KUZZLE_CHECK_INTERNET_ACCESS
-  echo $?
+  $KUZZLE_CHECK_INTERNET_ACCESS &> /dev/null
   if [ $? -ne 0 ]; then
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
@@ -270,21 +268,27 @@ check_kuzzle() {
 get_admin_console() {
   while [[ "$INSTALL_ADMIN_CONSOLE" != [yYnN] ]]
   do
+    echo $BLUE
+    echo " Kuzzle Admin Console"
     echo
-    echo "Kuzzle Admin Console is a stateless, lightweight Kuzzle client living on a web browser."
-    echo "An up-to-date version is freely available http://kuzzle-backoffice.netlify.com, and you may also execute it from a local location"
-    echo "(this might be useful if your servers don't have an open connection to the Internet)."
-    echo "Both versions will open a point-to-point connection between your web browser and a Kuzzle server and data will never be transmitted to anyone."
+    echo "Kuzzle Admin Console is a stateless, lightweight Kuzzle client that runs on a web browser." 
+    echo "An up-to-date online version is freely available http://kuzzle-backoffice.netlify.com, but you can* also execute it locally" 
+    echo "(useful if your servers don't have internet access)." 
+    echo "Both the online and the local version of the Kuzzle Admin Console will open a direct and secure client connection between your web browser and your Kuzzle server."
+    echo "Data flows only between the web browser and the Kuzzle server and is never transmitted to a third-party."
     echo "Do you want to install the offline Kuzzle Admin Console? (y/N)"
-    echo -n "> "
-    read installDL trash
+    echo -n "> "$NORMAL
+    read INSTALL_ADMIN_CONSOLE trash
     case $INSTALL_ADMIN_CONSOLE in
       [yY])
+         echo $BLUE"Fetching Kuzzle Admin Console..."$NORMAL
          $KUZZLE_DOWNLOAD_MANAGER $KUZZLE_ADMIN_CONSOLE_URL > $KUZZLE_ADMIN_CONSOLE_PATH
-         cd $KUZZLE_ADMIN_CONSOLE_PATH
-         tar -xvf $KUZZLE_ADMIN_CONSOLE_ARCHIVE
-         mv dist kuzzle-admin-console
-         echo "You can now access the Kuzzle Admin Console locally by going to your browser at file:///"$(pwd)"/kuzzle/kuzzle-admin-console"
+         cd $KUZZLE_DIR
+         tar -xf $KUZZLE_ADMIN_CONSOLE_ARCHIVE
+         mkdir kuzzle-admin-console &> /dev/null
+         mv dist/* kuzzle-admin-console/
+         echo $BLUE
+         echo "You can now access the Kuzzle Admin Console locally by going to your browser at file:/"$(pwd)"/kuzzle/kuzzle-admin-console/index.html"$NORMAL
         ;;
       [nN] | '')
         return 0
@@ -298,6 +302,7 @@ get_admin_console() {
 }
 
 the_end() {
+  echo
   echo $BLUE"You can see the logs of the Kuzzle stack by typing:"$NORMAL
   echo " docker-compose -f $COMPOSE_YML_PATH logs -f"
   echo $BLUE"You can stop Kuzzle by typing:"$NORMAL
