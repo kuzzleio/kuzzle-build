@@ -70,8 +70,7 @@ os_lookup() {
     } ;;
     *) 
     {
-        OS=OSTYPE
-        exit
+        OS=$OSTYPE
     } ;;
   esac
 }
@@ -85,12 +84,14 @@ set_download_manager() {
     KUZZLE_DOWNLOAD_MANAGER="$(command -v curl) "$CURL_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS" "
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} $COMPOSE_YML_URL -o /dev/null"
+    KUZZLE_CHECK_INTERNET_ACCESS=$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v curl) -o /dev/null http://localhost:7512"
     return 0
   elif command_exists wget; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v wget) "$WGET_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v wget)"$WGET_PUSH_OPTS
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER --server-response $COMPOSE_YML_URL 2>&1 | awk '/^  HTTP/{print \$2}' | tail -n 1"
+    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null kuzzle.io"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
@@ -134,7 +135,10 @@ prerequisite() {
   local ERROR=0
 
   # Check internet connection
-  if [ $(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE") -ne 200 ]; then
+  echo
+  echo "Checking internet access..."
+  $(eval "$KUZZLE_CHECK_INTERNET_ACCESS") &> /dev/null
+  if [ $? -ne 0 ]; then
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
   fi
@@ -189,8 +193,7 @@ download_docker_compose_yml() {
   while [ $TEST -ne 200 ];
     do
       if [ $RETRY -gt $DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY ]; then
-        >&2 echo $RED"Cannot download $COMPOSE_YML_URL."
-        >&2 echo "Please ensure you have internet or try again later."
+        >&2 echo $RED"Cannot download $COMPOSE_YML_URL (HTTP ERROR CODE: $TEST)"
         >&2 echo "If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."$NORMAL
         $KUZZLE_PUSH_ANALYTICS'{"type": "error-download-dockercomposeyml", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
         exit $ERROR_DOWNLOAD_DOCKER_COMPOSE
@@ -215,7 +218,7 @@ pull_kuzzle() {
     >&2 echo
     >&2 echo $RED"Pull failed. Please ensure your docker is running."
     >&2 echo "You can try and run docker with service docker start or dockerd."
-    >&2 echo "To know mor please refer to https://docs.docker.com/config/daemon"$NORMAL
+    >&2 echo "To know more please refer to https://docs.docker.com/config/daemon"$NORMAL
     exit $RET
   fi
   echo $GREEN"Pulled"$NORMAL
