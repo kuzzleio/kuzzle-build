@@ -23,6 +23,9 @@ CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
+KUZZLE_ADMIN_CONSOLE_ARCHIVE="kuzzle-admin-console.tar.gz"
+KUZZLE_ADMIN_CONSOLE_URL="dl.kuzzle.io/"$KUZZLE_ADMIN_CONSOLE_ARCHIVE
+KUZZLE_ADMIN_CONSOLE_PATH=$KUZZLE_DIR/$KUZZLE_ADMIN_CONSOLE_ARCHIVE
 
 # Errors return status
 NO_INTERNET=42
@@ -138,6 +141,8 @@ prerequisite() {
   echo
   echo "Checking internet access..."
   $(eval "$KUZZLE_CHECK_INTERNET_ACCESS") &> /dev/null
+  echo $KUZZLE_CHECK_INTERNET_ACCESS
+  echo $?
   if [ $? -ne 0 ]; then
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
@@ -262,6 +267,36 @@ check_kuzzle() {
   echo
 }
 
+get_admin_console() {
+  while [[ "$INSTALL_ADMIN_CONSOLE" != [yYnN] ]]
+  do
+    echo
+    echo "Kuzzle Admin Console is a stateless, lightweight Kuzzle client living on a web browser."
+    echo "An up-to-date version is freely available http://kuzzle-backoffice.netlify.com, and you may also execute it from a local location"
+    echo "(this might be useful if your servers don't have an open connection to the Internet)."
+    echo "Both versions will open a point-to-point connection between your web browser and a Kuzzle server and data will never be transmitted to anyone."
+    echo "Do you want to install the offline Kuzzle Admin Console? (y/N)"
+    echo -n "> "
+    read installDL trash
+    case $INSTALL_ADMIN_CONSOLE in
+      [yY])
+         $KUZZLE_DOWNLOAD_MANAGER $KUZZLE_ADMIN_CONSOLE_URL > $KUZZLE_ADMIN_CONSOLE_PATH
+         cd $KUZZLE_ADMIN_CONSOLE_PATH
+         tar -xvf $KUZZLE_ADMIN_CONSOLE_ARCHIVE
+         mv dist kuzzle-admin-console
+         echo "You can now access the Kuzzle Admin Console locally by going to your browser at file:///"$(pwd)"/kuzzle/kuzzle-admin-console"
+        ;;
+      [nN] | '')
+        return 0
+        ;;
+      *)
+        echo
+        >&2 $RED"Please, answer Y or N."$NORMAL
+        ;;
+    esac
+  done
+}
+
 the_end() {
   echo $BLUE"You can see the logs of the Kuzzle stack by typing:"$NORMAL
   echo " docker-compose -f $COMPOSE_YML_PATH logs -f"
@@ -339,6 +374,7 @@ fi
 echo $GREEN"Kuzzle successfully installed"$NORMAL
 echo
 
+get_admin_console
 the_end
 
 exit 0
