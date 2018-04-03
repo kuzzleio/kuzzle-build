@@ -276,7 +276,7 @@ the_end() {
   echo $BLUE"You can restart Kuzzle by typing:"$NORMAL
   echo " docker-compose -f $COMPOSE_YML_PATH restart"
   echo
-  echo "You can read the docs at http://docs.kuzzle.io/"
+  echo "You can read the docs and start following the getting started at https://docs.kuzzle.io/#sdk-play-time"
 }
 
 ######### MAIN
