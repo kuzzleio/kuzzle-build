@@ -27,13 +27,9 @@ OS=""
 # Errors return status
 NO_INTERNET=42
 NO_DOWNLOAD_MANAGER=43
-NO_DOCKER=44
-NO_DOCKER_COMPOSE=45
-DOCKER_VERSION_MISMATCH=46
-MIN_MAX_MAP_COUNT_MISMATCH=47
-ERROR_DOWNLOAD_DOCKER_COMPOSE=48
-KUZZLE_NOT_RUNNING_AFTER_INSTALL=49
-
+MISSING_DEPENDENCY=44
+ERROR_DOWNLOAD_DOCKER_COMPOSE=45
+KUZZLE_NOT_RUNNING_AFTER_INSTALL=46
 
 # list of colors
 # see if it supports colors...
@@ -131,10 +127,7 @@ vercomp () {
   return 0
 }
 
-prerequisite() {
-  local ERROR=0
-
-  # Check internet connection
+check_internet_acess() {
   echo
   echo "Checking internet access..."
   $KUZZLE_CHECK_INTERNET_ACCESS &> /dev/null
@@ -142,14 +135,19 @@ prerequisite() {
     <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
     exit $NO_INTERNET
   fi
+}
+
+prerequisite() {
+  local ERROR=0
 
   # Check if docker is installed
   if ! command_exists docker; then
-    >&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
+    >&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script."
+    >&2 echo "Please refer to https://docs.docker.com/install to know more about how to install docker."$NORMAL
     >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"
     >&2 echo "Once Docker is installed you will need to start it."$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
-    exit $NO_DOCKER
+    ERROR=$MISSING_DEPENDENCY
   fi
 
   # Check if docker-compose is installed
@@ -157,15 +155,17 @@ prerequisite() {
     >&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
     >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
-    exit $NO_DOCKER_COMPOSE
+    ERROR=$MISSING_DEPENDENCY
   fi
 
   # Check if docker version is at least $MIN_DOCKER_VER
-  vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
-  if [ $? -ne 0 ]; then
-    >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL
-    $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
-    exit $DOCKER_VERSION_MISMATCH
+  if [ $ERROR -eq 0 ]; then
+    vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
+    if [ $? -ne 0 ]; then
+      >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL
+      $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      ERROR=$MISSING_DEPENDENCY
+    fi
   fi
 
   # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
@@ -179,7 +179,11 @@ prerequisite() {
     >&2 echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
     >&2 echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL
     $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
-    exit $MIN_MAX_MAP_COUNT_MISMATCH
+    ERROR=$MISSING_DEPENDENCY
+  fi
+
+  if [ $ERROR -ne 0 ]; then
+    exit $ERROR
   fi
 }
 
@@ -315,6 +319,7 @@ echo " █                        ▐██████████████�
 echo " ██████████████████████████"
 
 set_download_manager
+check_internet_acess
 os_lookup
 
 $KUZZLE_PUSH_ANALYTICS'{"type": "start-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
