@@ -23,6 +23,23 @@ CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
+SYSTEMD_SERVICE="[Unit]\n
+Description=Kuzzle Service\n
+After=docker.service\n
+Requires=docker.service\n
+[Service]\n
+Type=simple\n
+WorkingDirectory=$PWD/kuzzle\n
+ExecStart=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH up\n
+ExecStop=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH stop\n
+Restart=on-abort\n
+[Install]\n
+WantedBy=multi-user.target"
+SCRIPT_ADD_TO_BOOT="#!/bin/bash
+echo -e \"$SYSTEMD_SERVICE\" > /etc/systemd/system/kuzzle.service
+systemctl enable kuzzle"
+SCRIPT_REMOVE_FROM_BOOT="#!/bin/bash
+systemctl disable kuzzle"
 
 # Errors return status
 NO_INTERNET=42
@@ -44,7 +61,11 @@ fi
 
 # Create kuzzle workspace directory
 if [ ! -d $KUZZLE_DIR ]; then
-  mkdir $KUZZLE_DIR;
+  mkdir $KUZZLE_DIR
+fi
+
+if [ ! -d $KUZZLE_DIR/script ]; then
+  mkdir $KUZZLE_DIR/script
 fi
 
 os_lookup() {
@@ -91,6 +112,7 @@ set_download_manager() {
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
+  >&2 echo 
   >&2 echo $RED"This script needs curl or wget installed."
   >&2 echo "Please install either one."$NORMAL
   exit $NO_DOWNLOAD_MANAGER
@@ -127,7 +149,7 @@ vercomp () {
   return 0
 }
 
-check_internet_acess() {
+check_internet_access() {
   echo
   echo "Checking internet access..."
   $KUZZLE_CHECK_INTERNET_ACCESS &> /dev/null
@@ -266,6 +288,13 @@ check_kuzzle() {
   echo
 }
 
+write_scripts() {
+  echo "$SCRIPT_ADD_TO_BOOT" > $KUZZLE_DIR/script/add-kuzzle-boot-systemd.sh
+  chmod +x $KUZZLE_DIR/script/add-kuzzle-boot-systemd.sh
+  echo "$SCRIPT_REMOVE_FROM_BOOT" > $KUZZLE_DIR/script/remove-kuzzle-boot-systemd.sh
+  chmod +x $KUZZLE_DIR/script/remove-kuzzle-boot-systemd.sh
+}
+
 the_end() {
   echo $BLUE"You can see the logs of the Kuzzle stack by typing:"$NORMAL
   echo " docker-compose -f $COMPOSE_YML_PATH logs -f"
@@ -319,8 +348,9 @@ echo " █                        ▐██████████████�
 echo " ██████████████████████████"
 
 set_download_manager
-check_internet_acess
+check_internet_access
 os_lookup
+write_scripts
 
 $KUZZLE_PUSH_ANALYTICS'{"type": "start-setup", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
 
