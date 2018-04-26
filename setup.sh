@@ -37,7 +37,7 @@ NCOLORS=$(tput colors)
 if [ "$NCOLORS" -gt 0 ]; then
   BOLD=$(tput bold)
   RED=$(tput setaf 1)
-  BLUE=$(tput setaf 4)
+  BLUE=$(tput setaf 6)
   NORMAL=$(tput sgr0)
   GREEN="$(tput setaf 2)"  
 fi
@@ -312,7 +312,8 @@ the_end() {
   write_info "You can restart Kuzzle by typing:"
   write " docker-compose -f $COMPOSE_YML_PATH restart"
   write
-  write "You can read the docs and start following the getting started at https://docs.kuzzle.io/#sdk-play-time"
+  write_info "You can read the docs and start following the getting started at"
+  write_title "https://docs.kuzzle.io/#sdk-play-time"
 }
 
 ######### MAIN
@@ -339,7 +340,8 @@ write "all the necessary dependencies."
 echo
 write "* You can refer to http://docs.kuzzle.io/ if you need better"
 write "  understanding of the installation process."
-write "* Feel free to join us on Gitter at $GITTER_URL if you need help."
+write "* Feel free to join us on Gitter at"
+write "  $GITTER_URL if you need help."
 echo
 
 write "                                ███████████████████████"
