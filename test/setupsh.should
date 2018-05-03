@@ -1,0 +1,59 @@
+#!/usr/bin/expect 
+
+proc color {foreground text} {
+    return [exec tput setaf $foreground]$text[exec tput sgr0]
+}
+
+proc bold {text} {
+    return [exec tput bold]$text[exec tput sgr0]
+}
+
+proc writeTitle {text} {
+    puts [bold " $text"]
+}
+
+proc writeError {text} {
+    puts [color 1 " $text"]
+}
+
+proc writeSuccess {text} {
+    puts [color 2 " $text"]
+}
+
+# Hides the output of the tested program
+log_user 0
+
+set testTitle [lindex $argv 0]
+set expectedString [lindex $argv 1]
+set expectedExitValue [lindex $argv 2]
+
+spawn ./setup.sh
+
+puts "\r"
+writeTitle "=> Setup.sh should $testTitle"
+puts "\r"
+expect "Ready" { send "\r" }
+
+expect {
+    "$expectedString" {
+        writeSuccess "\[✔\] Expected string ($expectedString) found"
+        exp_continue
+    }
+    timeout {
+        writeError "\[✖\] Expected string ($expectedString) not found"
+        puts "\r"
+        exit 1
+    }
+}
+
+lassign [wait] pid spawnid os_error_flag exitValue
+
+if [expr $exitValue == $expectedExitValue] {
+    writeSuccess "\[✔\] Expected exit value ($expectedExitValue) received"
+    puts "\r"
+    exit 0
+} else {
+    writeError "\[✖\] Expected exit value ($expectedExitValue) not received"
+    puts "\r"
+    exit 1
+}
