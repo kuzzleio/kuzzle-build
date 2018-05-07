@@ -20,14 +20,17 @@ proc writeSuccess {text} {
     puts [color 2 " $text"]
 }
 
-# Hides the output of the tested program
-log_user 0
+# Hides the output of the tested program (unless the SETUPSH_LOG_USER env var is set to 1)
+if { $::env(SETUPSH_LOG_USER) != 1 } {
+    log_user 0
+}
 
 set testTitle [lindex $argv 0]
 set expectedString [lindex $argv 1]
 set expectedExitValue [lindex $argv 2]
+set timeout 300
 
-spawn ./setup.sh
+spawn ../setup.sh --no-run
 
 puts "\r"
 writeTitle "=> Setup.sh should $testTitle"
@@ -53,7 +56,7 @@ if [expr $exitValue == $expectedExitValue] {
     puts "\r"
     exit 0
 } else {
-    writeError "\[✖\] Expected exit value ($expectedExitValue) not received"
+    writeError "\[✖\] Expected exit value ($expectedExitValue) not received (got $exitValue instead)"
     puts "\r"
     exit 1
 }
