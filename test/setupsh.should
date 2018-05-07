@@ -20,15 +20,15 @@ proc writeSuccess {text} {
     puts [color 2 " $text"]
 }
 
-# Hides the output of the tested program (unless the SETUPSH_LOG_USER env var is set to 1)
-if { $::env(SETUPSH_LOG_USER) != 1 } {
+# Hides the output of the tested program (unless the SETUPSH_LOG_USER env var is set to something)
+if { [ array names env SETUPSH_LOG_USER ] == "" } {
     log_user 0
 }
 
 set testTitle [lindex $argv 0]
 set expectedString [lindex $argv 1]
 set expectedExitValue [lindex $argv 2]
-set timeout 300
+set timeout -1
 
 spawn ../setup.sh --no-run
 

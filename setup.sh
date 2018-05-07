@@ -105,14 +105,14 @@ set_download_manager() {
     KUZZLE_DOWNLOAD_MANAGER="$(command -v curl) "$CURL_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS" "
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} $COMPOSE_YML_URL -o /dev/null"
-    KUZZLE_CHECK_INTERNET_ACCESS=$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE
+    KUZZLE_CHECK_INTERNET_ACCESS="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} google.com -o /dev/null"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v curl) -o /dev/null http://localhost:7512"
     return 0
   elif command_exists wget; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v wget) "$WGET_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v wget)"$WGET_PUSH_OPTS
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER --server-response $COMPOSE_YML_URL 2>&1 | awk '/^  HTTP/{print \$2}' | tail -n 1"
-    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null kuzzle.io"
+    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null google.com"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi

@@ -16,12 +16,13 @@ echo " Setting up test environment... ($DIST)"
 
 # Build and start docker container
 docker build -f test/Dockerfile.$1 . -t $IMAGE_NAME > /dev/null
-docker run -d --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME > /dev/null
+docker run -d -e SETUPSH_LOG_USER --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME > /dev/null
 
 trap remove_container INT
 trap remove_container EXIT
 
-# Test 1 - Check curl
+
+# Test - Check curl
 #########################################
 
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if curl is not installed\" \"This script needs curl\" 43"
@@ -30,7 +31,8 @@ if [ $? -ne "0" ]; then
     exit "$?"
 fi
 
-# Test 2
+
+# Test - Check internet connection
 #########################################
 
 # Setup (install curl and shut eth0 down)
@@ -52,7 +54,7 @@ docker exec -t $CONTAINER_NAME ip link set up dev eth0
 docker exec -t $CONTAINER_NAME ip r a default via 172.17.0.1 dev eth0
 
 
-# Test 3 - Check docker
+# Test - Check docker
 #########################################
 
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker is not installed\" \"You need docker to run Kuzzle\" 44"
@@ -61,7 +63,8 @@ if [ $? -ne "0" ]; then
     exit $?
 fi
 
-# Test 4 - Check docker-compose
+
+# Test - Check docker-compose
 #########################################
 
 # Setup (install docker)
@@ -76,7 +79,7 @@ if [ $? -ne "0" ]; then
 fi
 
 
-# Test 5 - Check vm_map_maxcount parameter
+# Test - Check vm_map_maxcount parameter
 #########################################
 
 # Setup (install docker-compose)
@@ -96,12 +99,36 @@ echo " Setting proper vm.max_map_count..."
 docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 262144 > /dev/null
 
 
-# Test 6 - Pull Kuzzle
+# Test - Download docker-compose.yml
+#########################################
+
+# Setup (redirect kuzzle.io to 127.0.0.1)
+echo " Killing kuzzle.io..."
+docker exec -t $CONTAINER_NAME sh -c "echo \"127.0.0.1 kuzzle.io\" >> /etc/hosts"
+
+# Check vm.max_map_count
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if downloading docker-compose.yml fails\" \"Cannot download\" 45"
+
+if [ $? -ne "0" ]; then
+    exit $?
+fi
+
+# Teardown (clean-up /etc/hosts)
+echo " Restoring kuzzle.io..."
+# Note: sed -i works badly in a Docker container
+docker exec -t $CONTAINER_NAME sh -c "cp /etc/hosts ~/hosts.new; sed -i '/kuzzle.io/d' ~/hosts.new; cp -f ~/hosts.new /etc/hosts"
+
+
+# Test - Pull Kuzzle
 #########################################
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if dockerd is not running\" \"Pull failed.\" 1"
 
+if [ $? -ne "0" ]; then
+    exit $?
+fi
+
 echo " Setting launching dockerd..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.sh
+docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.sh & > /dev/null
 
 
 # Test - Kuzzle works fine!
