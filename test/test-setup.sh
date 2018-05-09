@@ -23,8 +23,11 @@ echo
 echo " Setting up test environment..."
 
 # Build and start docker container
-# docker build -f test/Dockerfile.$1 . -t $IMAGE_NAME $OUTPUT
-docker run -d -e SETUPSH_LOG_USER --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME $OUTPUT
+docker run -d -e SETUPSH_LOG_USER -e COMPOSE_HTTP_TIMEOUT -e DOCKER_CLIENT_TIMEOUT --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME
+
+if [ $? -ne "0" ]; then
+    exit "$?"
+fi
 
 trap remove_container INT
 trap remove_container EXIT
@@ -45,7 +48,7 @@ fi
 
 # Setup (install curl and shut eth0 down)
 echo " Installing curl..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-curl.sh $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-curl.sh $OUTPUT" 
 echo " Shutting down eth0..."
 docker exec -t $CONTAINER_NAME ip link set down dev eth0
 
@@ -77,7 +80,7 @@ fi
 
 # Setup (install docker)
 echo " Installing docker..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker.sh $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker.sh $OUTPUT"
 
 # Check docker-compose
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker-compose is not installed\" \"You need docker-compose to be able to run Kuzzle\" 44"
@@ -92,9 +95,9 @@ fi
 
 # Setup (install docker-compose)
 echo " Installing docker-compose..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker-compose.sh $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker-compose.sh" $OUTPUT
 echo " Setting bad vm.max_map_count..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 242144 $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 242144 $OUTPUT"
 
 # Check vm.max_map_count
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if vm.max_map_count is too low\" \"The current value of the kernel configuration variable vm.max_map_count\" 44"
@@ -104,7 +107,7 @@ if [ $? -ne "0" ]; then
 fi
 
 echo " Setting proper vm.max_map_count..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 262144 $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 262144 $OUTPUT"
 
 
 # Test - Download docker-compose.yml
@@ -136,7 +139,7 @@ if [ $? -ne "0" ]; then
 fi
 
 echo " Launching dockerd..."
-docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.sh & $OUTPUT
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.sh & $OUTPUT"
 
 
 # Test - Kuzzle works fine!

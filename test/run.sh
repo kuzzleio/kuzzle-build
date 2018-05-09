@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $SHOW_DEBUG -eq 1 ]; then
+if [ $SHOW_DEBUG ]; then
   ARGS="--show-debug"
 fi
 
