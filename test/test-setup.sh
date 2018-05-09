@@ -8,6 +8,7 @@ DIST=$1
 
 if [ "$2" = "--show-debug" ]; then
     OUTPUT=""
+    export SETUPSH_LOG_USER=1
 else
     OUTPUT="> /dev/null"
 fi
