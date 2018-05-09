@@ -36,9 +36,12 @@ trap remove_container EXIT
 # Test - Check curl
 #########################################
 
+echo " Removing curl..."
+sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/remove-curl.sh $OUTPUT" 
+
 docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if curl is not installed\" \"This script needs curl\" 43"
 
-if [ $? -ne "0" ]; then
+if [ $? -ne 0 ]; then
     exit "$?"
 fi
 

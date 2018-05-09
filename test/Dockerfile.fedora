@@ -1,0 +1,7 @@
+FROM fedora:27
+
+RUN dnf install -y expect iproute
+
+WORKDIR /opt/test
+
+CMD tail -f /dev/null

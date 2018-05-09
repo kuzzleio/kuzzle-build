@@ -22,4 +22,30 @@ install_via_apt() {
     apt-get install -y docker-ce
 }
 
-install_via_apt
+install_via_yum() {
+    yum install -y yum-utils \
+        device-mapper-persistent-data \
+        lvm2
+    
+    exit 1
+}
+
+install_via_dnf() {
+    dnf -y install dnf-plugins-core
+
+    dnf config-manager \
+        --add-repo \
+        https://download.docker.com/linux/fedora/docker-ce.repo
+    
+    dnf install -y docker-ce
+}
+
+if [ $(command -v apt-get) ]; then
+    install_via_apt
+    exit 0
+fi
+
+if [ $(command -v dnf) ]; then
+    install_via_dnf
+    exit 0
+fi
