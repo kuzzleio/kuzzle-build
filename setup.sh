@@ -19,7 +19,7 @@ INSTALL_KUZZLE_WITHOUT_DOCKER_URL="https://docs.kuzzle.io/guide/essentials/insta
 MIN_DOCKER_VER=1.12.0
 MIN_MAX_MAP_COUNT=262144
 CONNECT_TO_KUZZLE_MAX_RETRY=30
-CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
+CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=8 # in seconds
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
@@ -269,6 +269,7 @@ run_kuzzle() {
   echo
   write_info "[ℹ] Starting Kuzzle..."
   $(command -v docker-compose) -f $COMPOSE_YML_PATH up -d
+  $(command -v docker-compose) -f $COMPOSE_YML_PATH logs -f
 }
 
 check_kuzzle() {
@@ -293,7 +294,7 @@ check_kuzzle() {
       exit $KUZZLE_NOT_RUNNING_AFTER_INSTALL
     fi
       echo -n "."
-      sleep 2
+      sleep $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY
       RETRY=$(expr $RETRY + 1)
     done
   $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
