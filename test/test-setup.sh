@@ -12,7 +12,7 @@ else
     OUTPUT="> /dev/null"
 fi
 
-IMAGE_NAME=kuzzleio/setupsh-test
+IMAGE_NAME=kuzzleio/setupsh-test-$DIST
 CONTAINER_NAME=setupsh-test
 
 echo
@@ -22,7 +22,7 @@ echo
 echo " Setting up test environment..."
 
 # Build and start docker container
-docker build -f test/Dockerfile.$1 . -t $IMAGE_NAME $OUTPUT
+# docker build -f test/Dockerfile.$1 . -t $IMAGE_NAME $OUTPUT
 docker run -d -e SETUPSH_LOG_USER --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME $OUTPUT
 
 trap remove_container INT
