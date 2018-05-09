@@ -268,7 +268,7 @@ run_kuzzle() {
   $KUZZLE_PUSH_ANALYTICS'{"type": "starting-kuzzle", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null      
   echo
   write_info "[ℹ] Starting Kuzzle..."
-  $(command -v docker-compose) -f $COMPOSE_YML_PATH up
+  COMPOSE_HTTP_TIMEOUT=120 $(command -v docker-compose) -f $COMPOSE_YML_PATH up
 }
 
 check_kuzzle() {
