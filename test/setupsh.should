@@ -30,7 +30,7 @@ set expectedString [lindex $argv 1]
 set expectedExitValue [lindex $argv 2]
 set timeout -1
 
-spawn ../setup.sh --no-run
+spawn ./setup.sh --no-run
 
 puts "\r"
 writeTitle "=> Setup.sh should $testTitle"

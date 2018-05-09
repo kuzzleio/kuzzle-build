@@ -127,7 +127,7 @@ if [ $? -ne "0" ]; then
     exit $?
 fi
 
-echo " Setting launching dockerd..."
+echo " Launching dockerd..."
 docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.sh & > /dev/null
 
 
