@@ -4,11 +4,13 @@ if [ "$SHOW_DEBUG" != "" ]; then
   ARGS="--show-debug"
 fi
 
-if [ -n $SETUPSH_TEST_DISTROS ]; then
-  SETUPSH_TEST_DISTROS=(ubuntu-artful debian-jessie)
+if [ -z $SETUPSH_TEST_DISTROS ]; then
+  DISTROS=(ubuntu-artful debian-jessie)
+else
+  IFS=', ' read -r -a DISTROS <<< "$SETUPSH_TEST_DISTROS"
 fi
 
-for DISTRO in ${SETUPSH_TEST_DISTROS[*]}
+for DISTRO in ${DISTROS[*]}
 do
   ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
   EXIT_VALUE=$?
