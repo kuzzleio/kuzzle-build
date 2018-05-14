@@ -1,7 +1,7 @@
 FROM ubuntu:artful
 
 RUN apt-get update -y && \
-    apt-get install -y expect iproute2
+    apt-get install -y software-properties-common python-software-properties lsb-release expect iproute2
 
 WORKDIR /opt/test
 
