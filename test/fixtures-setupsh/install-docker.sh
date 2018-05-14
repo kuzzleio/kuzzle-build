@@ -2,7 +2,8 @@
 
 install_via_apt() {
     apt-get install -y \
-        lsb-release \
+        software-properties-common python-software-properties \
+        lsb-core lsb-release \
         apt-transport-https \
         ca-certificates \
         curl \
