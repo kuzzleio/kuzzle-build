@@ -269,7 +269,7 @@ run_kuzzle() {
   echo
   write_info "[ℹ] Starting Kuzzle..."
   $(command -v docker-compose) -f $COMPOSE_YML_PATH up -d
-  $(command -v docker-compose) -f $COMPOSE_YML_PATH logs -f
+  $(command -v docker-compose) -f $COMPOSE_YML_PATH logs -f kuzzle
 }
 
 check_kuzzle() {
