@@ -1,9 +1,20 @@
 #!/bin/bash
 
-if [ $SHOW_DEBUG -eq 1 ]; then
+if [ "$SHOW_DEBUG" != "" ]; then
   ARGS="--show-debug"
 fi
 
-${BASH_SOURCE%/*}/test-setup.sh ubuntu-artful $ARGS
+if [ -n $SETUPSH_TEST_DISTROS ]; then
+  SETUPSH_TEST_DISTROS=(ubuntu-artful debian-jessie)
+fi
 
-exit $?
+for DISTRO in ${SETUPSH_TEST_DISTROS[*]}
+do
+  ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
+  EXIT_VALUE=$?
+  if [ $EXIT_VALUE -ne 0 ]; then
+      exit $EXIT_VALUE
+  fi
+done
+
+exit $EXIT_VALUE

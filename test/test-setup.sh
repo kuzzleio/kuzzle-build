@@ -1,7 +1,10 @@
 #!/bin/bash
 
 remove_container() {
+    sleep 2
     docker kill $CONTAINER_NAME > /dev/null
+    sleep 2
+    docker rm -vf  $CONTAINER_NAME > /dev/null
 }
 
 DIST=$1
@@ -14,7 +17,7 @@ else
 fi
 
 IMAGE_NAME=kuzzleio/setupsh-test-$DIST
-CONTAINER_NAME=setupsh-test
+CONTAINER_NAME=setupsh-test-$DIST
 
 echo
 echo "$(tput bold) Testing Setup.sh on $DIST"
@@ -148,7 +151,7 @@ sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.
 # Test - Kuzzle works fine!
 #########################################
 
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"install Kuzzle without problems\" \"Kuzzle successfully installed\" 0"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"run Kuzzle successfully\" \"Kuzzle successfully installed\" 0"
 EXIT_VALUE=$?
 
 # Teardown
