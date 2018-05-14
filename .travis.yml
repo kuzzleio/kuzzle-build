@@ -8,4 +8,4 @@ before_script:
 - sudo sysctl -w vm.max_map_count=262144
 
 script:
-- bash test/run.sh
+- travis_wait 30 bash test/run.sh
