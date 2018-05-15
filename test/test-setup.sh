@@ -34,14 +34,16 @@ fi
 trap remove_container INT
 trap remove_container EXIT
 
+echo
 
 # Test - Check curl
 #########################################
 
 # We only test curl if the tested distribution comes without it
-# echo "$(sh -c 'docker exec -t $CONTAINER_NAME which curl')"
-if [ -z "$(sh -c 'docker exec -t $CONTAINER_NAME command -v curl')" ]; then
-    docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if curl is not installed\" \"This script needs curl\" 43; exit $?"
+# echo $(docker exec -t $CONTAINER_NAME sh -c "command -v curl")
+
+if [ -z $(docker exec -t $CONTAINER_NAME sh -c "command -v curl") ]; then
+    docker exec -t $CONTAINER_NAME sh -ec "./setupsh.should \"fail if curl is not installed\" \"This script needs curl\" 43 && echo Ok > /dev/null"
     EXIT_VALUE=$?
     if [ $EXIT_VALUE -ne 0 ]; then
         exit $EXIT_VALUE
@@ -59,11 +61,11 @@ echo " Shutting down eth0..."
 docker exec -t $CONTAINER_NAME ip link set down dev eth0
 
 # Check internet
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if offline\" \"No internet\" 42; exit $?"
+docker exec -t $CONTAINER_NAME sh -ec "./setupsh.should \"fail if offline\" \"No internet\" 42 && echo Ok > /dev/null"
 EXIT_VALUE=$?
-if [ $EXIT_VALUE -ne 0 ]; then
+if [ "$EXIT_VALUE" != 0 ]; then
     echo "Exit value is $EXIT_VALUE"
-    exit $EXIT_VALUE
+    exit 1
 fi
 
 # Teardown (switch eth0 back on)
@@ -75,7 +77,7 @@ docker exec -t $CONTAINER_NAME ip r a default via 172.17.0.1 dev eth0
 # Test - Check docker
 #########################################
 
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker is not installed\" \"You need docker to run Kuzzle\" 44; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker is not installed\" \"You need docker to run Kuzzle\" 44 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
@@ -90,7 +92,7 @@ echo " Installing docker..."
 sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker.sh $OUTPUT"
 
 # Check docker-compose
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker-compose is not installed\" \"You need docker-compose to be able to run Kuzzle\" 44; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if docker-compose is not installed\" \"You need docker-compose to be able to run Kuzzle\" 44 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
@@ -105,8 +107,8 @@ echo " Installing docker-compose..."
 sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/install-docker-compose.sh $OUTPUT"
 
 # Check if sysctl exists
-if [ -z "$(sh -c 'docker exec -t $CONTAINER_NAME command -v sysctl')" ]; then
-    docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if sysctl is not installed\" \"This script needs sysctl\" 43; exit $?"
+if [ -z $(docker exec -t $CONTAINER_NAME sh -c "command -v sysctl") ]; then
+    docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if sysctl is not installed\" \"This script needs sysctl\" 44 && echo Ok > /dev/null"
     EXIT_VALUE=$?
     if [ $EXIT_VALUE -ne 0 ]; then
         exit $EXIT_VALUE
@@ -124,7 +126,7 @@ echo " Setting bad vm.max_map_count..."
 sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/set-map-count.sh 242144 $OUTPUT"
 
 # Check vm.max_map_count
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if vm.max_map_count is too low\" \"The current value of the kernel configuration variable vm.max_map_count\" 44; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if vm.max_map_count is too low\" \"The current value of the kernel configuration variable vm.max_map_count\" 44 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
@@ -142,7 +144,7 @@ echo " Killing kuzzle.io..."
 docker exec -t $CONTAINER_NAME sh -c "echo \"127.0.0.1 kuzzle.io\" >> /etc/hosts"
 
 # Check vm.max_map_count
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if downloading docker-compose.yml fails\" \"Cannot download\" 45; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if downloading docker-compose.yml fails\" \"Cannot download\" 45 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
@@ -156,7 +158,7 @@ docker exec -t $CONTAINER_NAME sh -c "cp /etc/hosts ~/hosts.new; sed -i '/kuzzle
 
 # Test - Pull Kuzzle
 #########################################
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if dockerd is not running\" \"Pull failed.\" 1; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"fail if dockerd is not running\" \"Pull failed.\" 1 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
@@ -169,7 +171,7 @@ sh -c "docker exec -t $CONTAINER_NAME /opt/test/fixtures-setupsh/launch-dockerd.
 # Test - Kuzzle works fine!
 #########################################
 
-docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"run Kuzzle successfully\" \"Kuzzle successfully installed\" 0; exit $?"
+docker exec -t $CONTAINER_NAME sh -c "./setupsh.should \"run Kuzzle successfully\" \"Kuzzle successfully installed\" 0 && echo Ok > /dev/null"
 EXIT_VALUE=$?
 
 exit $EXIT_VALUE
