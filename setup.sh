@@ -201,19 +201,28 @@ prerequisite() {
     fi
   fi
 
-  # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
-  VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
-  if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-    write_error
-    write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
-    write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-    write_error "    In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
-    write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-    write_info "     If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-    write_info "     and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+  # Check if sysctl exists on the machine
+  if ! command_exists sysctl; then
+    write_error "[✖] This script needs sysctl to check whether your kernel settings fit the requirements of Kuzzle."
+    write_error "    Please install sysctl and re-run this script."
     echo
-    $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-sysctl", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     ERROR=$MISSING_DEPENDENCY
+  else
+    # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
+    VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
+    if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
+      write_error
+      write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
+      write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
+      write_error "    In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+      write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
+      write_info "     If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+      write_info "     and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+      echo
+      $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      ERROR=$MISSING_DEPENDENCY
+    fi
   fi
 
   if [ $ERROR -ne 0 ]; then

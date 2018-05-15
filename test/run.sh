@@ -5,7 +5,7 @@ if [ "$SHOW_DEBUG" != "" ]; then
 fi
 
 if [ -z $SETUPSH_TEST_DISTROS ]; then
-  DISTROS=(ubuntu-artful debian-jessie)
+  DISTROS=(fedora ubuntu-artful debian-jessie)
 else
   IFS=', ' read -r -a DISTROS <<< "$SETUPSH_TEST_DISTROS"
 fi
