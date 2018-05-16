@@ -1,21 +1,22 @@
 #!/bin/bash
 
-kuzzle_host=http://localhost:7512/_healthCheck
-timeout=${HEALTHCHECK_TIMEOUT:-60}
+if [ "$SETUPSH_SHOW_DEBUG" != "" ]; then
+  ARGS="--show-debug"
+fi
 
-docker-compose -f docker-compose/kuzzle-docker-compose.yml up -d
+if [ -z $SETUPSH_TEST_DISTROS ]; then
+  DISTROS=(fedora ubuntu-artful debian-jessie)
+else
+  IFS=', ' read -r -a DISTROS <<< "$SETUPSH_TEST_DISTROS"
+fi
 
-echo "[$(date --rfc-3339 seconds)] - Waiting for Kuzzle to be available"
-for i in `seq 1 $timeout`;
+for DISTRO in ${DISTROS[*]}
 do
-    output=$( curl -s "$kuzzle_host" | grep \"status\":200 )
-    if [[ ! -z "$output" ]]; then
-      echo "[$(date --rfc-3339 seconds)] - Kuzzle is online"
-      exit 0
-    fi
-    echo "[$(date --rfc-3339 seconds)] - Still trying to connect to $kuzzle_host"
-    sleep 1
+  ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
+  EXIT_VALUE=$?
+  if [ $EXIT_VALUE -ne 0 ]; then
+      exit $EXIT_VALUE
+  fi
 done
 
-echo "[$(date --rfc-3339 seconds)] - Kuzzle does not seem to be online. Giving up"
-exit 1
+exit $EXIT_VALUE

@@ -1,0 +1,8 @@
+FROM ubuntu:artful
+
+RUN apt-get update -y && \
+    apt-get install -y expect iproute2
+
+WORKDIR /opt/test
+
+CMD tail -f /dev/null

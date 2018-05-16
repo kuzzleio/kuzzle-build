@@ -19,7 +19,7 @@ INSTALL_KUZZLE_WITHOUT_DOCKER_URL="https://docs.kuzzle.io/guide/essentials/insta
 MIN_DOCKER_VER=1.12.0
 MIN_MAX_MAP_COUNT=262144
 CONNECT_TO_KUZZLE_MAX_RETRY=30
-CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
+CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=16 # in seconds
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
@@ -105,14 +105,14 @@ set_download_manager() {
     KUZZLE_DOWNLOAD_MANAGER="$(command -v curl) "$CURL_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS" "
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} $COMPOSE_YML_URL -o /dev/null"
-    KUZZLE_CHECK_INTERNET_ACCESS=$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE
+    KUZZLE_CHECK_INTERNET_ACCESS="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} google.com -o /dev/null"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v curl) -o /dev/null http://localhost:7512"
     return 0
   elif command_exists wget; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v wget) "$WGET_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v wget)"$WGET_PUSH_OPTS
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER --server-response $COMPOSE_YML_URL 2>&1 | awk '/^  HTTP/{print \$2}' | tail -n 1"
-    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null kuzzle.io"
+    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null google.com"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
@@ -201,19 +201,28 @@ prerequisite() {
     fi
   fi
 
-  # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
-  VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
-  if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-    write_error
-    write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
-    write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-    write_error "    In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
-    write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-    write_info "     If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-    write_info "     and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+  # Check if sysctl exists on the machine
+  if ! command_exists sysctl; then
+    write_error "[✖] This script needs sysctl to check whether your kernel settings fit the requirements of Kuzzle."
+    write_error "    Please install sysctl and re-run this script."
     echo
-    $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-sysctl", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     ERROR=$MISSING_DEPENDENCY
+  else
+    # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
+    VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
+    if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
+      write_error
+      write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
+      write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
+      write_error "    In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+      write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
+      write_info "     If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+      write_info "     and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+      echo
+      $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      ERROR=$MISSING_DEPENDENCY
+    fi
   fi
 
   if [ $ERROR -ne 0 ]; then
@@ -293,7 +302,7 @@ check_kuzzle() {
       exit $KUZZLE_NOT_RUNNING_AFTER_INSTALL
     fi
       echo -n "."
-      sleep 2
+      sleep $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY
       RETRY=$(expr $RETRY + 1)
     done
   $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
