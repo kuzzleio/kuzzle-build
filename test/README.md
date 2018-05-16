@@ -1,5 +1,21 @@
 # Setup.sh test developer's handbook
 
+**Prerequisites**: Docker must be installed on the host machine.
+
+To run the tests on setup.sh open a console at the root of this repo and type
+
+```
+$ test/run.sh
+```
+
+This will run all the tests on all the available distributions.
+You can set some environment variables to customize the behavior of the test suite:
+
+* `SETUPSH_SHOW_DEBUG=1` shows the standard output of each test;
+* `SETUPSH_TEST_DISTROS=fedora,ubuntu-artful` specifies which distributions to test (as a comma-separated list).
+
+## Behind the scenes
+
 Setup.sh tests are performed by [expect](https://linux.die.net/man/1/expect), a linux command
 that allows to spawn a program, interact with by sending input to it and doing assertions on
 its output.
@@ -31,12 +47,3 @@ This can be resumed as the following
         * which spawns one `setup.sh` script per test case via `test/setupsh.should <test_title> <expected_string> <expected_exit_value>`
 
 The test suites are fail-fast: as soon as one case fails, the whole suite returns 1.
-
-## Environment Variables Reference
-
-When calling `test/run.sh` we can set environment variables to modify the script behavior
-
-* `SHOW_DEBUG` - if set to anything, shows the output of the setup, teardown and setup.sh call
-  for each test.
-* `COMPOSE_HTTP_TIMEOUT` - can be se to the number of seconds the docker client waits for a
-  socket to open on a container.
