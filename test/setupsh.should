@@ -20,8 +20,8 @@ proc writeSuccess {text} {
     puts [color 2 " $text"]
 }
 
-# Hides the output of the tested program (unless the SETUPSH_LOG_USER env var is set to something)
-if { [ array names env SETUPSH_LOG_USER ] == "" } {
+# Hides the output of the tested program (unless the SETUPSH_SHOW_DEBUG env var is set to something)
+if { [ array names env SETUPSH_SHOW_DEBUG ] == "" } {
     log_user 0
 }
 

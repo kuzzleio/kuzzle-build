@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$SHOW_DEBUG" != "" ]; then
+if [ "$SETUPSH_SHOW_DEBUG" != "" ]; then
   ARGS="--show-debug"
 fi
 
