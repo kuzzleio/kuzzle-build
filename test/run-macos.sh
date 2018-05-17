@@ -4,10 +4,8 @@ brew update || echo 'up to date'
 
 brew install expect docker docker-compose docker-machine xhyve docker-machine-driver-xhyve
 
-docker-machine create default --driver xhyve --xhyve-experimental-nfs-share
+sudo docker-machine create default --driver xhyve --xhyve-experimental-nfs-share
 
-exit 0
+sudo eval $(docker-machine env default)
 
-# eval $(docker-machine env default)
-
-# docker run -t hello-world
+sudo docker run -t hello-world
