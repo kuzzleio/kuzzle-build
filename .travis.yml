@@ -1,7 +1,3 @@
-os:
-  - linux
-  - osx
-
 dist: trusty
 sudo: required
 
@@ -9,8 +5,7 @@ services:
 - docker
 
 script:
-- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then bash test/run.sh; fi
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then bash test/run-macos.sh; fi
+- bash test/run.sh
 
 deploy:
   provider: pages
