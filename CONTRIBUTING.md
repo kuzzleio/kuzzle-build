@@ -11,4 +11,5 @@ instead of `master`. Then, when the team needs to update the published content, 
 
 * Make sure that `setup.sh` is in sync with the Kuzzle Analytics proxy (http://analytics.kuzzle.io/) so that
 the analytics still work.
-* Make sure that New Relic is in sync with the new version of `setup.sh`.
+* Make sure that New Relic probes are aware of the new version of `setup.sh`.
+* Make sure that the alert mails are still properly pushed by the Analytics Proxy.
