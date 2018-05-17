@@ -3,6 +3,8 @@
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 
+sysctl -w vm.max_map_count=262144
+
 [[ -d $BADGES_DIR ]] || mkdir $BADGES_DIR
 
 if [ "$SETUPSH_SHOW_DEBUG" != "" ]; then
