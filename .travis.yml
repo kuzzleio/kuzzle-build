@@ -9,3 +9,12 @@ before_script:
 
 script:
 - bash test/run.sh
+
+deploy:
+  provider: pages
+  skip-cleanup: true
+  local-dir: setupsh-badges
+  github-token: $GITHUB_TOKEN 
+  keep-history: true
+  on:
+    branch: gh-pages
