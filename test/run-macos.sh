@@ -2,7 +2,9 @@
 
 set -e
 
-brew install expect docker docker-compose docker-machine xhyve docker-machine-driver-xhyve || echo 'up to date'
+brew update || echo 'up to date'
+
+brew install expect docker docker-compose docker-machine xhyve docker-machine-driver-xhyve
 
 docker-machine create default --driver xhyve --xhyve-experimental-nfs-share
 
