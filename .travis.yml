@@ -1,3 +1,7 @@
+os:
+  - linux
+  - osx
+
 dist: trusty
 sudo: required
 
@@ -8,7 +12,8 @@ before_script:
 - sudo sysctl -w vm.max_map_count=262144
 
 script:
-- bash test/run.sh
+- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then bash test/run.sh; fi
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then bash test/run-macos.sh; fi
 
 deploy:
   provider: pages
