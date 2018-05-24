@@ -23,12 +23,12 @@ Or, you can clone this repository and run the script with options
 $ ./setup.sh --no-run
 ```
 
-only performs the system requirements checks and pulls the Docker images for the stack, without running it.
+only performs the system requirements checks and pulls a Kuzzle stack from Docker repositories, without running it.
 
-After running the stack, the `setup.sh` script checks whether Kuzzle is up or not within a delay of 60 seconds. If your system is slow, you can give additional delay by specifying the `CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY` environment variable
+After running the stack, the `setup.sh` script checks whether Kuzzle is up or not within the default delay of 30 seconds. If your system is slow, you can give additional delay by specifying the `CONNECT_TO_KUZZLE_MAX_RETRY` environment variable
 
 ```
-$ CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=4 ./setup.sh
+$ CONNECT_TO_KUZZLE_MAX_RETRY=180 ./setup.sh
 ```
 
-This will cause `setup.sh` to perform 30 checks every 4 seconds, for a total delay of 120 seconds.
+This will gige Kuzzle a total delay of 180 seconds to start.

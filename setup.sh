@@ -18,8 +18,8 @@ COMPOSE_YML_PATH=$KUZZLE_DIR/docker-compose.yml
 INSTALL_KUZZLE_WITHOUT_DOCKER_URL="https://docs.kuzzle.io/guide/essentials/installing-kuzzle/#manually"
 MIN_DOCKER_VER=1.12.0
 MIN_MAX_MAP_COUNT=262144
-CONNECT_TO_KUZZLE_MAX_RETRY=${CONNECT_TO_KUZZLE_MAX_RETRY:=30}
-CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=${CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY:=2} # in seconds
+CONNECT_TO_KUZZLE_MAX_RETRY=${CONNECT_TO_KUZZLE_MAX_RETRY:=30} # in seconds
+CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=1 
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
@@ -215,10 +215,11 @@ prerequisite() {
       write_error
       write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
       write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-      write_error "    In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+      write_info  "    In order to make Elasticsearch work, you need to set it with the following command (needs root access):"
       write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-      write_info "     If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-      write_info "     and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+      write_info  "    (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+      write_info  "    To persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+      write_info  "    and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
       echo
       $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       ERROR=$MISSING_DEPENDENCY
@@ -264,9 +265,12 @@ pull_kuzzle() {
   if [ $RET -ne 0 ]; then
     $KUZZLE_PUSH_ANALYTICS'{"type": "pull-failed", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     echo
-    write_error "[✖] Pull failed. Please ensure your docker is running."
-    write_error "    You can try and run docker with service docker start or dockerd."
-    write_error "    To know more please refer to https://docs.docker.com/config/daemon"
+    write_error "[✖] Pull failed. Is Docker running?"
+    write_info  "    You can try and run docker by typing"
+    write_info $BOLD "service docker start"
+    write_error "    or"
+    write_info $BOLD "dockerd &"
+    write_error "    To learn more, refer to https://docs.docker.com/config/daemon"
     exit $RET
   fi
   write_success "[✔] Pulled."
@@ -284,7 +288,7 @@ check_kuzzle() {
   local RETRY=0
 
   echo -n $BLUE"[ℹ] Checking if Kuzzle is running (timeout "
-  echo -n $(expr $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY \* $CONNECT_TO_KUZZLE_MAX_RETRY)
+  echo -n $(expr $CONNECT_TO_KUZZLE_MAX_RETRY)
   echo " seconds)"$NORMAL
   while ! $KUZZLE_CHECK_CONNECTIVITY_CMD &> /dev/null
     do
@@ -302,7 +306,7 @@ check_kuzzle() {
       exit $KUZZLE_NOT_RUNNING_AFTER_INSTALL
     fi
       echo -n "."
-      sleep $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY
+      sleep 1
       RETRY=$(expr $RETRY + 1)
     done
   $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null

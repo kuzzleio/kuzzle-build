@@ -23,14 +23,6 @@ install_via_apt() {
     apt-get install -y docker-ce
 }
 
-install_via_yum() {
-    yum install -y yum-utils \
-        device-mapper-persistent-data \
-        lvm2
-    
-    exit 1
-}
-
 install_via_dnf() {
     dnf -y install dnf-plugins-core
 
