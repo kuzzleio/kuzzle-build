@@ -1,21 +1,33 @@
 #!/bin/bash
 
-kuzzle_host=http://localhost:7512/_healthCheck
-timeout=${HEALTHCHECK_TIMEOUT:-60}
+FINAL_EXIT_VALUE=0
+BADGES_DIR=./setupsh-badges
 
-docker-compose -f docker-compose/kuzzle-docker-compose.yml up -d
+sysctl -w vm.max_map_count=262144
 
-echo "[$(date --rfc-3339 seconds)] - Waiting for Kuzzle to be available"
-for i in `seq 1 $timeout`;
+[[ -d $BADGES_DIR ]] || mkdir $BADGES_DIR
+
+if [ "$SETUPSH_SHOW_DEBUG" != "" ]; then
+  ARGS="--show-debug"
+fi
+
+if [ -z $SETUPSH_TEST_DISTROS ]; then
+  DISTROS=(fedora ubuntu-artful debian-jessie)
+else
+  IFS=', ' read -r -a DISTROS <<< "$SETUPSH_TEST_DISTROS"
+fi
+
+for DISTRO in ${DISTROS[*]}
 do
-    output=$( curl -s "$kuzzle_host" | grep \"status\":200 )
-    if [[ ! -z "$output" ]]; then
-      echo "[$(date --rfc-3339 seconds)] - Kuzzle is online"
-      exit 0
-    fi
-    echo "[$(date --rfc-3339 seconds)] - Still trying to connect to $kuzzle_host"
-    sleep 1
+  ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
+  EXIT_VALUE=$?
+  FORMATTED_DISTRO=$(echo $DISTRO | tr '-' '%20')
+  if [ $EXIT_VALUE -ne 0 ]; then
+      $FINAL_EXIT_VALUE=$EXIT_VALUE
+      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-red.svg -o $BADGES_DIR/$DISTRO.svg
+  else
+      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
+  fi
 done
 
-echo "[$(date --rfc-3339 seconds)] - Kuzzle does not seem to be online. Giving up"
-exit 1
+exit $FINAL_EXIT_VALUE
