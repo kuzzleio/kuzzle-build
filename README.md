@@ -31,4 +31,4 @@ After running the stack, the `setup.sh` script checks whether Kuzzle is up or no
 $ CONNECT_TO_KUZZLE_MAX_RETRY=180 ./setup.sh
 ```
 
-This will gige Kuzzle a total delay of 180 seconds to start.
+This will give Kuzzle a total delay of 180 seconds to start.
