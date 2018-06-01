@@ -18,8 +18,8 @@ COMPOSE_YML_PATH=$KUZZLE_DIR/docker-compose.yml
 INSTALL_KUZZLE_WITHOUT_DOCKER_URL="https://docs.kuzzle.io/guide/essentials/installing-kuzzle/#manually"
 MIN_DOCKER_VER=1.12.0
 MIN_MAX_MAP_COUNT=262144
-CONNECT_TO_KUZZLE_MAX_RETRY=30
-CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=2 # in seconds
+CONNECT_TO_KUZZLE_MAX_RETRY=${CONNECT_TO_KUZZLE_MAX_RETRY:=30} # in seconds
+CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY=1 
 DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY=3
 DOWNLOAD_DOCKER_COMPOSE_RETRY_WAIT_TIME=1 # in seconds
 OS=""
@@ -54,7 +54,7 @@ NCOLORS=$(tput colors)
 if [ "$NCOLORS" -gt 0 ]; then
   BOLD=$(tput bold)
   RED=$(tput setaf 1)
-  BLUE=$(tput setaf 4)
+  BLUE=$(tput setaf 6)
   NORMAL=$(tput sgr0)
   GREEN="$(tput setaf 2)"  
 fi
@@ -92,6 +92,31 @@ os_lookup() {
   esac
 }
 
+# Output a text with the selected color (reinit to normal at the end)
+write() {
+  echo -e " $1$2" "$NORMAL"
+}
+
+write_error() {
+  >&2 echo $RED "$1$2" "$NORMAL" 
+}
+
+write_info() {
+  echo $BLUE "$1$2" "$NORMAL"
+}
+
+write_success() {
+  echo $GREEN "$1$2" "$NORMAL"
+}
+
+write_title() {
+  echo -e "${BOLD} $1$2" "$NORMAL"
+}
+
+prompt_bold() {
+  echo -n -e "${BOLD} $1$2" "$NORMAL"
+}
+
 command_exists() {
   command -v "$1" > /dev/null 2>&1
 }
@@ -101,20 +126,22 @@ set_download_manager() {
     KUZZLE_DOWNLOAD_MANAGER="$(command -v curl) "$CURL_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v curl) "$CURL_PUSH_OPTS" "
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} $COMPOSE_YML_URL -o /dev/null"
-    KUZZLE_CHECK_INTERNET_ACCESS=$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE
+    KUZZLE_CHECK_INTERNET_ACCESS="$KUZZLE_DOWNLOAD_MANAGER -w %{http_code} google.com -o /dev/null"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v curl) -o /dev/null http://localhost:7512"
     return 0
   elif command_exists wget; then
     KUZZLE_DOWNLOAD_MANAGER="$(command -v wget) "$WGET_OPTS
     KUZZLE_PUSH_ANALYTICS="$(command -v wget)"$WGET_PUSH_OPTS
     KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE="$KUZZLE_DOWNLOAD_MANAGER --server-response $COMPOSE_YML_URL 2>&1 | awk '/^  HTTP/{print \$2}' | tail -n 1"
-    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null kuzzle.io"
+    KUZZLE_CHECK_INTERNET_ACCESS="wget -o /dev/null google.com"
     KUZZLE_CHECK_CONNECTIVITY_CMD="$(command -v wget) --tries 1 -o /dev/null http://localhost:7512"
     return 0
   fi
-  >&2 echo 
-  >&2 echo $RED"This script needs curl or wget installed."
-  >&2 echo "Please install either one."$NORMAL
+
+  echo
+  write_error "[✖] This script needs curl or wget installed."
+  write_error "Please install either one."
+  echo
   exit $NO_DOWNLOAD_MANAGER
 }
 
@@ -151,31 +178,36 @@ vercomp () {
 
 check_internet_access() {
   echo
-  echo "Checking internet access..."
+  write_info "[ℹ] Checking internet access..."
   $KUZZLE_CHECK_INTERNET_ACCESS &> /dev/null
   if [ $? -ne 0 ]; then
-    <&2 echo $RED"No internet connection. Please ensure you have internet access."$NORMAL
+    write_error "[✖] No internet connection. Please ensure you have internet access."
+    echo
     exit $NO_INTERNET
   fi
+  write_success "[✔] Ok."
 }
 
 prerequisite() {
   local ERROR=0
-
+  echo
+  write_info "[ℹ] Checking prerequisites..."
   # Check if docker is installed
   if ! command_exists docker; then
-    >&2 echo $RED"You need docker to be able to run Kuzzle from this setup. Please install it and re-run this script."
-    >&2 echo "Please refer to https://docs.docker.com/install to know more about how to install docker."$NORMAL
-    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"
-    >&2 echo "Once Docker is installed you will need to start it."$NORMAL
+    write_error "[✖] You need docker to run Kuzzle from this setup. Please install it and re-run this script."
+    write_error "    Please refer to https://docs.docker.com/install to know more about how to install docker."
+    write_error "    If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"
+    write_error "    Once Docker is installed you will need to start it."
+    echo
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
     ERROR=$MISSING_DEPENDENCY
   fi
 
   # Check if docker-compose is installed
   if ! command_exists docker-compose; then
-    >&2 echo $RED"You need docker-compose to be able to run Kuzzle from this setup. Please install it and re-run this script"$NORMAL
-    >&2 echo "If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"$NORMAL
+    write_error "[✖] You need docker-compose to be able to run Kuzzle from this setup. Please install it and re-run this script"
+    write_error "    If you want to install Kuzzle without docker please see $INSTALL_KUZZLE_WITHOUT_DOCKER_URL"
+    echo
     $KUZZLE_PUSH_ANALYTICS'{"type": "missing-docker-compose", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     ERROR=$MISSING_DEPENDENCY
   fi
@@ -184,43 +216,57 @@ prerequisite() {
   if [ $ERROR -eq 0 ]; then
     vercomp $(docker -v | sed 's/[^0-9.]*\([0-9.]*\).*/\1/') $MIN_DOCKER_VER
     if [ $? -ne 0 ]; then
-      >&2 echo $RED"You need docker version to be at least $MIN_DOCKER_VER"$NORMAL
+      write_error "[✖] You need docker version to be at least $MIN_DOCKER_VER"
+      echo
       $KUZZLE_PUSH_ANALYTICS'{"type": "docker-version-mismatch", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       ERROR=$MISSING_DEPENDENCY
     fi
   fi
 
-  # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
-  VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
-  if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-    >&2 echo
-    >&2 echo $RED"The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
-    >&2 echo "is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-    >&2 echo "In order to make ElasticSearch working please set it by using on root: (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
-    >&2 echo $BLUE$BOLD"sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-    >&2 echo $RED"If you want to persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-    >&2 echo "and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."$NORMAL
-    $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+  # Check if sysctl exists on the machine
+  if ! command_exists sysctl; then
+    write_error "[✖] This script needs sysctl to check whether your kernel settings fit the requirements of Kuzzle."
+    write_error "    Please install sysctl and re-run this script."
+    echo
+    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-sysctl", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
     ERROR=$MISSING_DEPENDENCY
+  else
+    # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
+    VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
+    if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
+      write_error
+      write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
+      write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
+      write_info  "    In order to make Elasticsearch work, you need to set it with the following command (needs root access):"
+      write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
+      write_info  "    (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+      write_info  "    To persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+      write_info  "    and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+      echo
+      $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      ERROR=$MISSING_DEPENDENCY
+    fi
   fi
 
   if [ $ERROR -ne 0 ]; then
     exit $ERROR
   fi
+
+  write_success "[✔] Ok."
 }
 
 download_docker_compose_yml() {
   local RETRY=0
 
   echo 
-  echo $BLUE"Downloading Kuzzle docker-compose.yml file..."$NORMAL
+  write_info "[ℹ] Downloading Kuzzle docker-compose.yml file..."
 
   TEST=$(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE")
   while [ $TEST -ne 200 ];
     do
       if [ $RETRY -gt $DOWNLOAD_DOCKER_COMPOSE_YML_MAX_RETRY ]; then
-        >&2 echo $RED"Cannot download $COMPOSE_YML_URL (HTTP ERROR CODE: $TEST)"
-        >&2 echo "If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."$NORMAL
+        write_error "[✖] Cannot download $COMPOSE_YML_URL (HTTP ERROR CODE: $TEST)"
+        write_error "    If the problem persist contact us at $SUPPORT_MAIL or on gitter at $GITTER_URL."
         $KUZZLE_PUSH_ANALYTICS'{"type": "error-download-dockercomposeyml", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
         exit $ERROR_DOWNLOAD_DOCKER_COMPOSE
       fi
@@ -229,62 +275,65 @@ download_docker_compose_yml() {
       TEST=$(eval "$KUZZLE_CHECK_DOCKER_COMPOSE_YML_HTTP_STATUS_CODE")
     done
   $KUZZLE_DOWNLOAD_MANAGER $COMPOSE_YML_URL > $COMPOSE_YML_PATH
-  echo $GREEN"Downloaded"$NORMAL
+  write_success "[✔] Downloaded."
   echo
 }
 
 pull_kuzzle() {
-  echo $BLUE"Pulling latest version of Kuzzle from dockerhub"$NORMAL
-  echo
+  write_info "[ℹ] Pulling latest version of Kuzzle from Dockerhub..."
   $KUZZLE_PUSH_ANALYTICS'{"type": "pulling-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
   $(command -v docker-compose) -f $COMPOSE_YML_PATH pull
   RET=$?
   if [ $RET -ne 0 ]; then
     $KUZZLE_PUSH_ANALYTICS'{"type": "pull-failed", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
-    >&2 echo
-    >&2 echo $RED"Pull failed. Please ensure your docker is running."
-    >&2 echo "You can try and run docker with service docker start or dockerd."
-    >&2 echo "To know more please refer to https://docs.docker.com/config/daemon"$NORMAL
+    echo
+    write_error "[✖] Pull failed. Is Docker running?"
+    write_info  "    You can try and run docker by typing"
+    write_info $BOLD "service docker start"
+    write_error "    or"
+    write_info $BOLD "dockerd &"
+    write_error "    To learn more, refer to https://docs.docker.com/config/daemon"
     exit $RET
   fi
-  echo $GREEN"Pulled"$NORMAL
+  write_success "[✔] Pulled."
   $KUZZLE_PUSH_ANALYTICS'{"type": "pulled-latest-containers", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null  
 }
 
 run_kuzzle() {
   $KUZZLE_PUSH_ANALYTICS'{"type": "starting-kuzzle", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null      
   echo
-  echo $BLUE"Starting Kuzzle..."$NORMAL
+  write_info "[ℹ] Starting Kuzzle..."
   $(command -v docker-compose) -f $COMPOSE_YML_PATH up -d
 }
 
 check_kuzzle() {
   local RETRY=0
 
-  echo -n $BLUE"Checking if Kuzzle is running (timeout "
-  echo -n $(expr $CONNECT_TO_KUZZLE_WAIT_TIME_BETWEEN_RETRY \* $CONNECT_TO_KUZZLE_MAX_RETRY)
+  echo -n $BLUE"[ℹ] Checking if Kuzzle is running (timeout "
+  echo -n $(expr $CONNECT_TO_KUZZLE_MAX_RETRY)
   echo " seconds)"$NORMAL
   while ! $KUZZLE_CHECK_CONNECTIVITY_CMD &> /dev/null
     do
     if [ $RETRY -gt $CONNECT_TO_KUZZLE_MAX_RETRY ]; then
       $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-failed-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       >&2 echo
-      >&2 echo $RED"Ooops! Something went wrong."
-      >&2 echo "Kuzzle does not seem to respond as expected to requests to"
-      >&2 echo "http://localhost:7512"$NORMAL
-      >&2 echo
-      echo "Feel free to get in touch with the support team by sending"
-      echo "a mail to $SUPPORT_MAIL or by joining the chat room on"
-      echo "Gitter at $GITTER_URL - We'll be glad to help you."
+      write_error "[✖] Ooops! Something went wrong."
+      write_error "Kuzzle does not seem to respond as expected to requests to"
+      write_error "http://localhost:7512"
+      echo
+      write "Feel free to get in touch with the support team by sending"
+      write "a mail to $SUPPORT_MAIL or by joining the chat room on"
+      write "Gitter at $GITTER_URL - We'll be glad to help you."
 
       exit $KUZZLE_NOT_RUNNING_AFTER_INSTALL
     fi
       echo -n "."
-      sleep 2
+      sleep 1
       RETRY=$(expr $RETRY + 1)
     done
   $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null
-  echo $GREEN"Kuzzle is now running"$NORMAL
+  echo
+  write_success "[✔] Kuzzle is now running."
   echo
 }
 
@@ -296,16 +345,17 @@ write_scripts() {
 }
 
 the_end() {
-  echo $BLUE"You can see the logs of the Kuzzle stack by typing:"$NORMAL
-  echo " docker-compose -f $COMPOSE_YML_PATH logs -f"
-  echo $BLUE"You can stop Kuzzle by typing:"$NORMAL
-  echo " docker-compose -f $COMPOSE_YML_PATH stop"
-  echo $BLUE"You can start Kuzzle by typing:"$NORMAL
-  echo " docker-compose -f $COMPOSE_YML_PATH up -d"
-  echo $BLUE"You can restart Kuzzle by typing:"$NORMAL
-  echo " docker-compose -f $COMPOSE_YML_PATH restart"
-  echo
-  echo "You can read the docs and start following the getting started at https://docs.kuzzle.io/#sdk-play-time"
+  write_info "You can see the logs of the Kuzzle stack by typing:"
+  write " docker-compose -f $COMPOSE_YML_PATH logs -f"
+  write_info "You can stop Kuzzle by typing:"
+  write " docker-compose -f $COMPOSE_YML_PATH stop"
+  write_info "You can start Kuzzle by typing:"
+  write " docker-compose -f $COMPOSE_YML_PATH up -d"
+  write_info "You can restart Kuzzle by typing:"
+  write " docker-compose -f $COMPOSE_YML_PATH restart"
+  write
+  write_info "You can read the docs and start following the getting started at"
+  write_title "https://docs.kuzzle.io/#sdk-play-time"
 }
 
 ######### MAIN
@@ -322,30 +372,34 @@ if [ ! -f "${KUZZLE_DIR}/uid" ]; then
 fi
 
 ANALYTICS_UUID=$(cat "${KUZZLE_DIR}/.uid")
+clear
+echo
+write_title "# Kuzzle Setup"
+write_title "  ============"
+echo
+write "This script will help you running Kuzzle and installing"
+write "all the necessary dependencies."
+echo
+write "* You can refer to http://docs.kuzzle.io/ if you need better"
+write "  understanding of the installation process."
+write "* Feel free to join us on Gitter at"
+write "  $GITTER_URL if you need help."
+echo
 
+write "                                ███████████████████████"
+write " ██████████████████████████████████████████████████████"
+write " █                            ▐█     ███  █████     ███"
+write " █    █  █   █   █  █████    ▐██████ ███  █████  ██████"
+write " █    █ █    █   █      █    ██████ ████  █████    ████"
+write " █    ██     █   █     █    ▐█████ █████  █████  ██████"
+write " █    █ █    █   █    █     █████ ██████  █████  ██████"
+write " █    █ █    █   █   █     ▐████     ███     ██     ███"
+write " █    █  █    ███   █████  ████████████████████████████"
+write " █                        ▐████████████████████████████"
+write " ██████████████████████████"
 echo
-echo "# Kuzzle Setup"
-echo "  ============"
-echo
-echo "This script will help you running Kuzzle and installing"
-echo "all the necessary dependencies."
-echo
-echo "* You can refer to http://docs.kuzzle.io/ if you need better"
-echo "  understanding of the installation process."
-echo "* Feel free to join us on Gitter at $GITTER_URL if you need help."
-echo
-
-echo "                                ███████████████████████"
-echo " ██████████████████████████████████████████████████████"
-echo " █                            ▐█     ███  █████     ███"
-echo " █    █  █   █   █  █████    ▐██████ ███  █████  ██████"
-echo " █    █ █    █   █      █    ██████ ████  █████    ████"
-echo " █    ██     █   █     █    ▐█████ █████  █████  ██████"
-echo " █    █ █    █   █    █     █████ ██████  █████  ██████"
-echo " █    █ █    █   █   █     ▐████     ███     ██     ███"
-echo " █    █  █    ███   █████  ████████████████████████████"
-echo " █                        ▐████████████████████████████"
-echo " ██████████████████████████"
+prompt_bold "[❓] Ready to go? (Ctrl + C to abort)"
+read vazyGroNaz
 
 set_download_manager
 check_internet_access
@@ -371,11 +425,12 @@ if [ "$1" != "--no-run" ]; then
   run_kuzzle
   check_kuzzle
 fi
-echo $GREEN"Kuzzle successfully installed"$NORMAL
+echo
+write_success $BOLD"[✔] Kuzzle successfully installed"
 echo
 
 the_end
-
+echo
 exit 0
 
 ########## END OF MAIN
