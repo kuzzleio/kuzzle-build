@@ -1,6 +1,7 @@
 #!/bin/bash
 
-sshd &
+# sshd &
+sudo systemsetup -setremotelogin on
 echo "public ip: "
 echo $(curl -s "http://ifconfig.me")
 
