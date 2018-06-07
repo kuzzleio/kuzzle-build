@@ -363,7 +363,7 @@ the_end() {
   write_title "https://docs.kuzzle.io/#sdk-play-time"
 }
 
-######### MAIN
+######## MAIN
 
 if [ "$1" == "--help" ]; then
   echo "--help     show this help"
