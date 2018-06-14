@@ -224,27 +224,29 @@ prerequisite() {
   fi
 
   # Check if sysctl exists on the machine
-  if ! command_exists sysctl; then
-    write_error "[✖] This script needs sysctl to check whether your kernel settings fit the requirements of Kuzzle."
-    write_error "    Please install sysctl and re-run this script."
-    echo
-    $KUZZLE_PUSH_ANALYTICS'{"type": "missing-sysctl", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
-    ERROR=$MISSING_DEPENDENCY
-  else
-    # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
-    VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
-    if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
-      write_error
-      write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
-      write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
-      write_info  "    In order to make Elasticsearch work, you need to set it with the following command (needs root access):"
-      write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
-      write_info  "    (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
-      write_info  "    To persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
-      write_info  "    and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+  if [ "$OS" != "OSX" ]; then
+    if ! command_exists sysctl; then
+      write_error "[✖] This script needs sysctl to check whether your kernel settings fit the requirements of Kuzzle."
+      write_error "    Please install sysctl and re-run this script."
       echo
-      $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+      $KUZZLE_PUSH_ANALYTICS'{"type": "missing-sysctl", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       ERROR=$MISSING_DEPENDENCY
+    else
+      # Check of vm.max_map_count is at least $MIN_MAX_MAP_COUNT
+      VM_MAX_MAP_COUNT=$(sysctl -n vm.max_map_count)
+      if [ -z "${VM_MAX_MAP_COUNT}" ] || [ ${VM_MAX_MAP_COUNT} -lt $MIN_MAX_MAP_COUNT ]; then
+        write_error
+        write_error "[✖] The current value of the kernel configuration variable vm.max_map_count (${VM_MAX_MAP_COUNT})"
+        write_error "    is lower than the required one ($MIN_MAX_MAP_COUNT+)."
+        write_info  "    In order to make Elasticsearch work, you need to set it with the following command (needs root access):"
+        write_info $BOLD "sysctl -w vm.max_map_count=$MIN_MAX_MAP_COUNT"
+        write_info  "    (more at https://www.elastic.co/guide/en/elasticsearch/reference/5.x/vm-max-map-count.html)"
+        write_info  "    To persist it please edit the $BLUE$BOLD/etc/sysctl.conf$NORMAL$RED file"
+        write_info  "    and add $BLUE$BOLD vm.max_map_count=$MIN_MAX_MAP_COUNT$NORMAL$RED in it."
+        echo
+        $KUZZLE_PUSH_ANALYTICS'{"type": "wrong-max_map_count", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
+        ERROR=$MISSING_DEPENDENCY
+      fi
     fi
   fi
 
@@ -318,8 +320,11 @@ check_kuzzle() {
       $KUZZLE_PUSH_ANALYTICS'{"type": "kuzzle-failed-running", "uid": "'$ANALYTICS_UUID'", "os": "'$OS'"}' $ANALYTICS_URL &> /dev/null    
       >&2 echo
       write_error "[✖] Ooops! Something went wrong."
-      write_error "Kuzzle does not seem to respond as expected to requests to"
-      write_error "http://localhost:7512"
+      write_error "    Kuzzle does not seem to be running"
+      if [ "$OS" = "OSX" ]; then
+        write_info "[i] This might be due to a bad setting of your Docker For Mac. Have a look at the following issue:"
+        write_info "https://stackoverflow.com/questions/41192680/update-max-map-count-for-elasticsearch-docker-container-mac-host"
+      fi
       echo
       write "Feel free to get in touch with the support team by sending"
       write "a mail to $SUPPORT_MAIL or by joining the chat room on"
@@ -358,7 +363,7 @@ the_end() {
   write_title "https://docs.kuzzle.io/#sdk-play-time"
 }
 
-######### MAIN
+######## MAIN
 
 if [ "$1" == "--help" ]; then
   echo "--help     show this help"
