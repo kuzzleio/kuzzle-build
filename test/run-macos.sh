@@ -1,16 +1,14 @@
 #!/bin/bash
 
-set -x
+cd test
 
-brew install expect docker docker-compose docker-machine
-brew cask install virtualbox
+export CONNECT_TO_KUZZLE_MAX_RETRY=180
+export SETUPSH_SHOW_DEBUG=1
 
-# sudo chown root:wheel /usr/local/opt/docker-machine-driver-xhyve/bin/docker-machine-driver-xhyve
-# sudo chmod u+s /usr/local/opt/docker-machine-driver-xhyve/bin/docker-machine-driver-xhyve
+./setupsh.should "Install Kuzzle successfully" "Kuzzle successfully installed" 0
 
-curl --create-dirs -Lo ~/.docker/machine/cache/boot2docker.iso https://github.com/boot2docker/boot2docker/releases/download/v1.9.1/boot2docker.iso
-docker-machine --github-api-token=$GITHUB_TOKEN --virtualbox-no-vtx-check --driver virtualbox create default 
+EXIT_VALUE=$?
 
-sudo eval $(docker-machine env default)
+docker-compose -f kuzzle/docker-compose.yml kill
 
-sudo docker run -t hello-world
+exit $EXIT_VALUE
