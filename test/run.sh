@@ -28,10 +28,18 @@ do
   FORMATTED_DISTRO=$(echo $DISTRO | tr '-' '%20')
   if [ $EXIT_VALUE -ne 0 ]; then
       FINAL_EXIT_VALUE=$EXIT_VALUE
-      echo "Tests on $DISTRO are RED."
+      echo
+      echo "======================================="
+      echo "[✖] Tests on $DISTRO are RED."
+      echo "======================================="
+      echo
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-red.svg -o $BADGES_DIR/$DISTRO.svg
   else
-      echo "Tests on $DISTRO are GREEN."
+      echo
+      echo "========================================"
+      echo "[✔] Tests on $DISTRO are GREEN."
+      echo "========================================"
+      echo
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
   fi
 done
