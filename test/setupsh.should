@@ -1,10 +1,17 @@
 #!/usr/bin/expect -f
 
+
 proc color {foreground text} {
+    if { [ array names env term ] == "" } {
+        return $text
+    }
     return [exec tput setaf $foreground]$text[exec tput sgr0]
 }
 
 proc bold {text} {
+    if { [ array names env term ] == "" } {
+        return $text
+    }
     return [exec tput bold]$text[exec tput sgr0]
 }
 
