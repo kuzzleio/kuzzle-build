@@ -30,17 +30,17 @@ do
   if [ $EXIT_VALUE -ne 0 ]; then
       FINAL_EXIT_VALUE=$EXIT_VALUE
       echo
-      echo "======================================="
+      echo "========================================"
       echo "[✖] Tests on $DISTRO are RED." 
-      echo "======================================="
+      echo "========================================"
       echo
       echo "[$DISTRO] Failed." >> $REPORT_FILE
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-red.svg -o $BADGES_DIR/$DISTRO.svg
   else
       echo
-      echo "========================================"
+      echo "========================================="
       echo "[✔] Tests on $DISTRO are GREEN."
-      echo "========================================"
+      echo "========================================="
       echo
       echo "[$DISTRO] Succeeded." >> $REPORT_FILE
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
