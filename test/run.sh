@@ -1,11 +1,11 @@
 #!/bin/bash
 
-set -x
+set -x 
 
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 DEFAULT_DISTROS=(fedora ubuntu-artful debian-jessie osx)
-sysctl -w vm.max_map_count=262144
+sudo sysctl -w vm.max_map_count=262144
 
 [[ -d $BADGES_DIR ]] || mkdir $BADGES_DIR
 
@@ -29,7 +29,7 @@ do
   EXIT_VALUE=$?
   FORMATTED_DISTRO=$(echo $DISTRO | tr '-' '%20')
   if [ $EXIT_VALUE -ne 0 ]; then
-      $FINAL_EXIT_VALUE=$EXIT_VALUE
+      FINAL_EXIT_VALUE=$EXIT_VALUE
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-red.svg -o $BADGES_DIR/$DISTRO.svg
   else
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
