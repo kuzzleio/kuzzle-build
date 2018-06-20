@@ -30,8 +30,8 @@ Requires=docker.service\n
 [Service]\n
 Type=simple\n
 WorkingDirectory=$PWD/kuzzle\n
-ExecStart=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH up\n
-ExecStop=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH stop\n
+ExecStart=$(command -v docker-compose) -f $PWD/$COMPOSE_YML_PATH up\n
+ExecStop=$(command -v docker-compose) -f $PWD/$COMPOSE_YML_PATH stop\n
 Restart=on-abort\n
 [Install]\n
 WantedBy=multi-user.target"
