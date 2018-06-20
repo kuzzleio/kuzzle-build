@@ -22,7 +22,7 @@ fi
 for DISTRO in ${DISTROS[*]}
 do
   if [ "$DISTRO" = "osx" ]; then
-    ssh $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_BRANCH"
+    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_BRANCH"
   else
     ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
   fi
