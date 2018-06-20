@@ -3,7 +3,6 @@
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 DEFAULT_DISTROS="fedora,ubuntu-artful,debian-jessie,osx"
-sudo sysctl -w vm.max_map_count=262144
 
 [[ -d $BADGES_DIR ]] || mkdir $BADGES_DIR
 

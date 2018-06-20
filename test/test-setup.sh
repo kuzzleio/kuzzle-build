@@ -25,7 +25,7 @@ echo
 echo " Setting up test environment..."
 
 # Build and start docker container
-sh -c "docker run -d -e SETUPSH_SHOW_DEBUG -e COMPOSE_HTTP_TIMEOUT -e DOCKER_CLIENT_TIMEOUT -e CONNECT_TO_KUZZLE_MAX_RETRY --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME $OUTPUT"
+docker run -d -e SETUPSH_SHOW_DEBUG -e COMPOSE_HTTP_TIMEOUT -e DOCKER_CLIENT_TIMEOUT -e CONNECT_TO_KUZZLE_MAX_RETRY --privileged --rm --name $CONTAINER_NAME -v $PWD:/opt $IMAGE_NAME $OUTPUT
 EXIT_VALUE=$?
 if [ $EXIT_VALUE -ne 0 ]; then
     exit $EXIT_VALUE
