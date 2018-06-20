@@ -51,7 +51,7 @@ KUZZLE_NOT_RUNNING_AFTER_INSTALL=46
 # list of colors
 # see if it supports colors...
 NCOLORS=$(tput colors)
-if [ "$NCOLORS" -gt 0 ]; then
+if [ $? -eq 0 ] && [ $NCOLORS -gt 0 ]; then
   BOLD=$(tput bold)
   RED=$(tput setaf 1)
   BLUE=$(tput setaf 6)
@@ -321,7 +321,7 @@ check_kuzzle() {
       >&2 echo
       write_error "[✖] Ooops! Something went wrong."
       write_error "    Kuzzle does not seem to be running"
-      if "$OS" = "OSX"; then
+      if [ "$OS" = "OSX" ]; then
         write_info "[i] This might be due to a bad setting of your Docker For Mac. Have a look at the following issue:"
         write_info "https://stackoverflow.com/questions/41192680/update-max-map-count-for-elasticsearch-docker-container-mac-host"
       fi

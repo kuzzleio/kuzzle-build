@@ -3,7 +3,9 @@
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 DEFAULT_DISTROS="fedora,ubuntu-artful,debian-jessie,osx"
+REPORT_FILE=.setupsh-test.report
 
+[[ -f $REPORT_FILE ]] && rm $REPORT_FILE
 [[ -d $BADGES_DIR ]] || mkdir $BADGES_DIR
 
 if [ "$SETUPSH_SHOW_DEBUG" != "" ]; then
@@ -29,9 +31,10 @@ do
       FINAL_EXIT_VALUE=$EXIT_VALUE
       echo
       echo "======================================="
-      echo "[✖] Tests on $DISTRO are RED."
+      echo "[✖] Tests on $DISTRO are RED." 
       echo "======================================="
       echo
+      echo "[$DISTRO] Failed." >> $REPORT_FILE
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-red.svg -o $BADGES_DIR/$DISTRO.svg
   else
       echo
@@ -39,6 +42,7 @@ do
       echo "[✔] Tests on $DISTRO are GREEN."
       echo "========================================"
       echo
+      echo "[$DISTRO] Succeeded." >> $REPORT_FILE
       curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
   fi
 done
