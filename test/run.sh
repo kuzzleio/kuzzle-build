@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Testing Pull Request # $TRAVIS_PULL_REQUEST"
+
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 DEFAULT_DISTROS="fedora,ubuntu-artful,debian-jessie,osx"
@@ -21,7 +23,7 @@ fi
 for DISTRO in ${DISTROS[*]}
 do
   if [ "$DISTRO" = "osx" ]; then
-    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_BRANCH"
+    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_COMMIT"
   else
     ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
   fi
