@@ -35,7 +35,7 @@ git pull
 test/test-setup.macos.sh
 EXIT_VALUE=$?
 
-[[ -d kuzzle ]] && rm -rf kuzzle
+[[ -d test/kuzzle ]] && rm -rf test/kuzzle
 
 clean_lock() {
     [[ -f $LOCK_FILE ]] && rm $LOCK_FILE
