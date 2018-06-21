@@ -1,7 +1,5 @@
 #!/bin/bash
 
-echo "Testing Pull Request # $TRAVIS_PULL_REQUEST"
-
 FINAL_EXIT_VALUE=0
 BADGES_DIR=./setupsh-badges
 DEFAULT_DISTROS="fedora,ubuntu-artful,debian-jessie,osx"
@@ -33,7 +31,7 @@ do
       FINAL_EXIT_VALUE=$EXIT_VALUE
       echo
       echo "========================================"
-      echo "[✖] Tests on $DISTRO are RED." 
+      echo "[✖] Tests on $DISTRO are RED."
       echo "========================================"
       echo
       echo "[$DISTRO] Failed." >> $REPORT_FILE
@@ -45,7 +43,7 @@ do
       echo "========================================="
       echo
       echo "[$DISTRO] Succeeded." >> $REPORT_FILE
-      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
+      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg
   fi
 done
 
