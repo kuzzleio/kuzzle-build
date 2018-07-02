@@ -21,21 +21,10 @@ echo
 echo " Testing Setup.sh on OSX"
 echo " ================================"
 
-WORK_BRANCH=$1
-
-if [ "$WORK_BRANCH" = "" ]; then
-  WORK_BRANCH=1.x
-fi
-
-cd kuzzle-build
-git fetch
-git checkout $WORK_BRANCH
-git pull
-
-test/test-setup.macos.sh
+${BASH_SOURCE%/*}/test-setup.macos.sh
 EXIT_VALUE=$?
 
-[[ -d test/kuzzle ]] && rm -rf test/kuzzle
+[[ -d ${BASH_SOURCE%/*}/kuzzle ]] && rm -rf ${BASH_SOURCE%/*}/kuzzle
 
 clean_lock() {
     [[ -f $LOCK_FILE ]] && rm $LOCK_FILE

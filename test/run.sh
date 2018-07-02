@@ -21,11 +21,15 @@ fi
 for DISTRO in ${DISTROS[*]}
 do
   if [ "$DISTRO" = "osx" ]; then
-    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_COMMIT"
+    MAC_FOLDER=/tmp/kuzzle-build-$TRAVIS_COMMIT
+    scp -r -o StrictHostKeyChecking=no . $MAC_USER@$MAC_HOST:$MAC_FOLDER
+    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "$MAC_FOLDER/test/run-macos.sh"
+    EXIT_VALUE=$?
+    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "rm -rf $MAC_FOLDER"
   else
     ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
+    EXIT_VALUE=$?
   fi
-  EXIT_VALUE=$?
   FORMATTED_DISTRO=$(echo $DISTRO | tr '-' '%20')
   if [ $EXIT_VALUE -ne 0 ]; then
       FINAL_EXIT_VALUE=$EXIT_VALUE
