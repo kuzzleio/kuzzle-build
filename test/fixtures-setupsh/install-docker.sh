@@ -1,6 +1,7 @@
 #!/bin/bash
 
 install_via_apt() {
+    apt-get update
     apt-get install -y \
         software-properties-common python-software-properties \
         lsb-core lsb-release \

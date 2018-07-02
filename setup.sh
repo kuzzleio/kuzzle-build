@@ -30,8 +30,8 @@ Requires=docker.service\n
 [Service]\n
 Type=simple\n
 WorkingDirectory=$PWD/kuzzle\n
-ExecStart=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH up\n
-ExecStop=$(which docker-compose) -f $PWD/$COMPOSE_YML_PATH stop\n
+ExecStart=$(command -v docker-compose) -f $PWD/$COMPOSE_YML_PATH up\n
+ExecStop=$(command -v docker-compose) -f $PWD/$COMPOSE_YML_PATH stop\n
 Restart=on-abort\n
 [Install]\n
 WantedBy=multi-user.target"
@@ -51,7 +51,7 @@ KUZZLE_NOT_RUNNING_AFTER_INSTALL=46
 # list of colors
 # see if it supports colors...
 NCOLORS=$(tput colors)
-if [ "$NCOLORS" -gt 0 ]; then
+if [ $? -eq 0 ] && [ $NCOLORS -gt 0 ]; then
   BOLD=$(tput bold)
   RED=$(tput setaf 1)
   BLUE=$(tput setaf 6)

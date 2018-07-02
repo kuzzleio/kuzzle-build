@@ -1,1 +1,4 @@
 .idea
+kuzzle
+.setupsh-test.report
+.DS_Store

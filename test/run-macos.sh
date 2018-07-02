@@ -1,18 +1,33 @@
 #!/bin/bash
 
-set -x
+LOCK_FILE=/tmp/test-setupsh.lock
+LOCK_SLEEP=2
+LOCK_MAX_RETRY=250
+LOCK_RETRY=0
 
-brew update || echo 'up to date'
+if [ -f $LOCK_FILE ]; then
+    echo -n "Another test is ongoing, waiting for it to finish..."
+fi
+while [ -f  $LOCK_FILE ] && [ $LOCK_RETRY -lt $LOCK_MAX_RETRY ]; do
+    sleep $LOCK_SLEEP
+    echo -n "."
+    LOCK_RETRY=$(expr $LOCK_RETRY + 1)
+done
 
-brew install expect docker docker-compose docker-machine xhyve docker-machine-driver-xhyve
+trap clean_lock EXIT INT
+touch $LOCK_FILE
 
-sudo chown root:wheel /usr/local/opt/docker-machine-driver-xhyve/bin/docker-machine-driver-xhyve
-sudo chmod u+s /usr/local/opt/docker-machine-driver-xhyve/bin/docker-machine-driver-xhyve
+echo
+echo " Testing Setup.sh on OSX"
+echo " ================================"
 
-curl --create-dirs -Lo ~/.docker/machine/cache/boot2docker.iso https://github.com/boot2docker/boot2docker/releases/download/v1.9.1/boot2docker.iso
-sudo rm /etc/exports
-docker-machine --github-api-token=$GITHUB_TOKEN create default --driver xhyve --xhyve-experimental-nfs-share
+${BASH_SOURCE%/*}/test-setup.macos.sh
+EXIT_VALUE=$?
 
-sudo eval $(docker-machine env default)
+[[ -d ${BASH_SOURCE%/*}/kuzzle ]] && rm -rf ${BASH_SOURCE%/*}/kuzzle
 
-sudo docker run -t hello-world
+clean_lock() {
+    [[ -f $LOCK_FILE ]] && rm $LOCK_FILE
+}
+
+exit $EXIT_VALUE

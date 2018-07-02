@@ -6,6 +6,7 @@ fi
 
 # Detect apt
 if [ $(command -v apt-get) ]; then
+    apt-get update
     apt-get install -y curl
     exit 0
 fi
