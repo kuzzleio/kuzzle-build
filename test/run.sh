@@ -21,7 +21,7 @@ fi
 for DISTRO in ${DISTROS[*]}
 do
   if [ "$DISTRO" = "osx" ]; then
-    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_BRANCH"
+    ssh -o StrictHostKeyChecking=no $MAC_USER@$MAC_HOST "./test-setup.sh $TRAVIS_COMMIT"
   else
     ${BASH_SOURCE%/*}/test-setup.sh $DISTRO $ARGS
   fi
@@ -31,7 +31,7 @@ do
       FINAL_EXIT_VALUE=$EXIT_VALUE
       echo
       echo "========================================"
-      echo "[✖] Tests on $DISTRO are RED." 
+      echo "[✖] Tests on $DISTRO are RED."
       echo "========================================"
       echo
       echo "[$DISTRO] Failed." >> $REPORT_FILE
@@ -43,7 +43,7 @@ do
       echo "========================================="
       echo
       echo "[$DISTRO] Succeeded." >> $REPORT_FILE
-      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg      
+      curl -L https://img.shields.io/badge/setup.sh-$FORMATTED_DISTRO-green.svg -o $BADGES_DIR/$DISTRO.svg
   fi
 done
 
