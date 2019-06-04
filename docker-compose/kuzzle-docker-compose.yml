@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 services:
   kuzzle:
@@ -17,7 +17,7 @@ services:
       - NODE_ENV=production
 
   redis:
-    image: redis:3.2
+    image: redis:${REDIS_VERSION:-5}
 
   elasticsearch:
     image: kuzzleio/elasticsearch:5.4.1
