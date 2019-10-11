@@ -15,7 +15,7 @@ services:
       - "./haproxy/snakeoil.pem:/etc/ssl/private/snakeoil.pem"
 
   kuzzle:
-    image: kuzzleio/kuzzle
+    image: kuzzleio/kuzzle:1
     cap_add:
       - SYS_PTRACE
     depends_on:
@@ -28,10 +28,10 @@ services:
       - NODE_ENV=production
 
   redis:
-    image: redis:3.2
+    image: redis:5
 
   elasticsearch:
-    image: kuzzleio/elasticsearch:5.4.1
+    image: kuzzleio/elasticsearch:5.6.10
     environment:
       - cluster.name=kuzzle
       - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
